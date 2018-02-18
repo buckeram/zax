@@ -51,30 +51,30 @@ public class ZCPU extends Object implements Runnable {
     private final int ARGTYPE_WORD = 1; // Word
 
     // Other objects associated with this ZMachine
-    private ZMemory memory; // This ZMachine's memory
-    private ZObjectTable objTable; // This ZMachine's object table
+    private final ZMemory memory; // This ZMachine's memory
+    private final ZObjectTable objTable; // This ZMachine's object table
     private Stack callStack; // This ZMachine's call stack
-    private ZRandom rndgen; // This ZMachine's random number generator
-    private ZIOCard ioCard; // This ZMachine's I/O card
-    private ZUserInterface zui; // User interface supplied to constructor
+    private final ZRandom rndgen; // This ZMachine's random number generator
+    private final ZIOCard ioCard; // This ZMachine's I/O card
+    private final ZUserInterface zui; // User interface supplied to constructor
 
     // Private variables
     private String curStoryFile; // The storyfile we're using
-    private int version = 0; // Version of the game we're playing.
+    private int version; // Version of the game we're playing.
     private int programScale; // Scaling factor for this program
     private ZCallFrame curCallFrame; // Current call frame
     private int curInstruction; // Instruction currently being executed
     private int curOpcode; // Opcode (untyped instruction) being executed
     private int curOpcodeType; // Type of current opcode;
     private int op1, op2, op1type, op2type; // Current operands for 1OPs and 2OPs and their types.
-    private int[] vops = new int[8]; // Current operands for VARs and EXTs
-    private int[] voptypes = new int[8]; // Type of current VAR/EXT operands
+    private final int[] vops = new int[8]; // Current operands for VARs and EXTs
+    private final int[] voptypes = new int[8]; // Type of current VAR/EXT operands
     private int numvops; // Number of operands for VARs and EXTs
     private int curBranch; // Current branch argument
     private boolean curBranchReversed; // Current branch logic reversed?
     private int curResult; // Current result argument
     private String curString; // Current string argument
-    private boolean decode_ret_flag = false; // Set to true when decodeLoop must return
+    private boolean decode_ret_flag; // Set to true when decodeLoop must return
     private int ret_value; // Value from last RET instruction, if returning from interrupt
     private int abbrevTable; // Location in memory of abbreviation table.
     private int globalVars; // Location in memory of global variables
@@ -82,14 +82,14 @@ public class ZCPU extends Object implements Runnable {
     private boolean restartFlag; // true if this is a restart
 	private int mainDictionary; // Address of main dictionary
 	private byte[] undoState; // Current undo state
-    private boolean did_newline = false; // Set to true whenever NEW_LINE called--used by READ
+    private boolean did_newline; // Set to true whenever NEW_LINE called--used by READ
     
     // Default alphabets for decoding Z-Strings
-	private boolean altCharSet = false; // True if we're using an alternate character set
-    private int alphabetL = 0;
-    private int alphabetU = 1;
+	private final boolean altCharSet = false; // True if we're using an alternate character set (not used)
+    private final int alphabetL = 0; // not used anyway
+    private final int alphabetU = 1;
     private int alphabetP = 2; // Set to 3 in V1
-    private char[][] alphabet = {
+    private final char[][] alphabet = {
         { ' ','\0','\0','\0','\0','\0','a','b','c','d','e','f','g','h','i',
           'j','k','l','m','n','o','p','q','r','s','t','u','v','w',
           'x','y','z' },
@@ -110,12 +110,12 @@ public class ZCPU extends Object implements Runnable {
     // a game).
     public ZCPU(ZUserInterface ui)
     {
-        zui = ui;
-        memory = new ZMemory();
-        callStack = new Stack();
-        rndgen = new ZRandom();
-        ioCard = new ZIOCard();
-        objTable = new ZObjectTable();
+        this.zui = ui;
+        this.memory = new ZMemory();
+        this.callStack = new Stack();
+        this.rndgen = new ZRandom();
+        this.ioCard = new ZIOCard();
+        this.objTable = new ZObjectTable();
     }
 
     // The initialize method does several things: loads a game;
@@ -131,135 +131,132 @@ public class ZCPU extends Object implements Runnable {
         
         // If this is a restart, remember the value of the printer
         // transcript bit.
-        if (restartFlag) {
-            if ((memory.fetchWord(0x10) & 0x01) == 0x01)
-                transcriptOn = true;
-            else
-                transcriptOn = false;
+        if (this.restartFlag) {
+            transcriptOn = (this.memory.fetchWord(0x10) & 0x01) == 0x01;
         }
 
         // First, initialize all of the objects.  For the ZMemory
         // object, this includes loading the game file.
-        curStoryFile = storyFile;
-        memory.initialize(zui,storyFile);
-        version = memory.fetchByte(0x00);
-        if ((version < 1) || (version > 8) || (version == 6))
-            zui.fatal("Unsupported storyfile version: " +
-                        String.valueOf(version) + ".");
-        zui.initialize(version);
-        rndgen.initialize(zui);
-        ioCard.initialize(zui,memory,version,true);
-        objTable.initialize(zui,memory,version);
+        this.curStoryFile = storyFile;
+        this.memory.initialize(this.zui,storyFile);
+        this.version = this.memory.fetchByte(0x00);
+        if (this.version < 1 || this.version > 8 || this.version == 6)
+            this.zui.fatal("Unsupported storyfile version: " +
+                        String.valueOf(this.version) + ".");
+        this.zui.initialize(this.version);
+        this.rndgen.initialize(this.zui);
+        this.ioCard.initialize(this.zui, this.memory, this.version,true);
+        this.objTable.initialize(this.zui, this.memory, this.version);
 
         // Get the program scale
-        if (version <= 3)
-            programScale = 2;
-        else if ((version == 4) || (version == 5))
-            programScale = 4;
+        if (this.version <= 3)
+            this.programScale = 2;
+        else if (this.version == 4 || this.version == 5)
+            this.programScale = 4;
         else
-            programScale = 8;
+            this.programScale = 8;
 
         // If this is a V1 game, we need to use the V1 P alhabet.
-        if (version == 1)
-            alphabetP = 3;
+        if (this.version == 1)
+            this.alphabetP = 3;
 
         // Now do necessary modifications to the IROM.
         // First the byte at 0x01 (the only byte used in V1-3).
-        i = memory.fetchByte(0x01);
+        i = this.memory.fetchByte(0x01);
 
 		// Set bits at 0x01 for V1-3 games
-		if (version <= 3) {
+		if (this.version <= 3) {
 	        i = i & ~0x08; // Tandy bit off
-		    if (zui.hasStatusLine())
+		    if (this.zui.hasStatusLine())
 			    i = i & ~0x10; // Status line not not available
 		    else
 			    i = i | 0x10; // Status line not available
-			if (zui.hasUpperWindow())
+			if (this.zui.hasUpperWindow())
 				i = i | 0x20; // Upper window available
 			else
 				i = i & ~0x20; // Upper window not available
-		    if (zui.defaultFontProportional())
+		    if (this.zui.defaultFontProportional())
 			    i = i | 0x40; // Default font is proportional
 			else
 				i = i & ~0x40; // Default font is fixed-width
 		}
 		else { // Set bits for V4+ games
-			if ((version >= 5) && (zui.hasColors()))
+			if (this.version >= 5 && this.zui.hasColors())
 				i = i | 0x01;
 			// V6 picture bit at bit 1
-			if (zui.hasBoldface())
+			if (this.zui.hasBoldface())
 				i = i | 0x04;
-			if (zui.hasItalic())
+			if (this.zui.hasItalic())
 				i = i | 0x08;
-			if (zui.hasFixedWidth())
+			if (this.zui.hasFixedWidth())
 				i = i | 0x10;
 			// V6 sound bit at bit 5
-			if (zui.hasTimedInput())
+			if (this.zui.hasTimedInput())
 			    i = i | 0x80;
 		}
-        memory.putByte(0x01,i);
+        this.memory.putByte(0x01,i);
 
 		// In V4+, set various other IROM bytes
-		if (version >= 4) {
-			memory.putByte(0x1e,6); // We'll say we're an MS-DOS interpreter
-			memory.putByte(0x1f,(byte)'A'); // Interpreter version
+		if (this.version >= 4) {
+            this.memory.putByte(0x1e,6); // We'll say we're an MS-DOS interpreter
+            this.memory.putByte(0x1f,(byte)'A'); // Interpreter version
 
 			// Screen height and width in characters
-			s = zui.getScreenCharacters();
-			memory.putByte(0x20,s.height);
-			memory.putByte(0x21,s.width);
+			s = this.zui.getScreenCharacters();
+            this.memory.putByte(0x20,s.height);
+            this.memory.putByte(0x21,s.width);
 
 			// Screen height and width in units, font size in units, colors (V5+)
-			if (version >= 5) {
-				s = zui.getScreenUnits();
-				memory.putWord(0x22,s.width);
-				memory.putWord(0x24,s.height);
-				s = zui.getFontSize();
-				memory.putByte(0x26,s.height);
-				memory.putByte(0x27,s.width);
-				memory.putByte(0x2c,zui.getDefaultBackground());
-				memory.putByte(0x2d,zui.getDefaultForeground());
+			if (this.version >= 5) {
+				s = this.zui.getScreenUnits();
+                this.memory.putWord(0x22,s.width);
+                this.memory.putWord(0x24,s.height);
+				s = this.zui.getFontSize();
+                this.memory.putByte(0x26,s.height);
+                this.memory.putByte(0x27,s.width);
+                this.memory.putByte(0x2c, this.zui.getDefaultBackground());
+                this.memory.putByte(0x2d, this.zui.getDefaultForeground());
 			}
 		}
 
         // If we're restarting, restore the printer transcript bit
-        if (restartFlag) {
-            i = memory.fetchWord(0x10);
+        if (this.restartFlag) {
+            i = this.memory.fetchWord(0x10);
             if (transcriptOn)
                 i = i | 0x01;
             else
                 i = i & ~0x01;
-            memory.putWord(0x10,i);
-            restartFlag = false; // From here on, it's a new program
+            this.memory.putWord(0x10,i);
+            this.restartFlag = false; // From here on, it's a new program
         }
 
         // Get the location of the abbreviation table
-        if (version > 1)
-            abbrevTable = memory.fetchWord(0x18);
+        if (this.version > 1)
+            this.abbrevTable = this.memory.fetchWord(0x18);
 
         // Get the location of the global variable table
-        globalVars = memory.fetchWord(0x0c);
+        this.globalVars = this.memory.fetchWord(0x0c);
 
 		// Get the location of the main dictionary
-		mainDictionary = memory.fetchWord(0x08);
+        this.mainDictionary = this.memory.fetchWord(0x08);
 
 		// Get size of dynamic memory
-		dynamicMemorySize = memory.fetchWord(0x0e);
+        this.dynamicMemorySize = this.memory.fetchWord(0x0e);
 
         // Get any additional terminating characters, and pass them to
         // the user interface. (V5+)
-        if (version >= 5) {
-            termChars = memory.fetchWord(0x2e);
+        if (this.version >= 5) {
+            termChars = this.memory.fetchWord(0x2e);
             if (termChars != 0) {
                 i = 0;
-                int tc = memory.fetchByte(termChars);
+                int tc = this.memory.fetchByte(termChars);
                 Vector terminators = new Vector();
                 while (tc != 0) {
                     terminators.addElement(new Integer(tc));
                     i++;
-                    tc = memory.fetchByte(termChars+i);
+                    tc = this.memory.fetchByte(termChars+i);
                 }
-                zui.setTerminatingCharacters(terminators);
+                this.zui.setTerminatingCharacters(terminators);
             }
         }
         
@@ -275,7 +272,7 @@ public class ZCPU extends Object implements Runnable {
         // If the version number is 0, then we haven't loaded
         // a storyfile yet.  For now, this just means an immediate
         // return.
-        if (version == 0)
+        if (this.version == 0)
             return null;
 
 		// Otherwise, start a new thread, which starts with this object's run()
@@ -287,29 +284,30 @@ public class ZCPU extends Object implements Runnable {
 	}
 
 	// This method is called when the ZMachine thread is started.
-	public void run()
+	@Override
+    public void run()
 	{
 		do {
 			// Reinitialize if this is a restart
-			if (restartFlag) {
-				initialize(curStoryFile);
-				restartFlag = false;
+			if (this.restartFlag) {
+				initialize(this.curStoryFile);
+                this.restartFlag = false;
 			}
 
 			// Create an initial call-stack frame
-	        curCallFrame = new ZCallFrame();
-			curCallFrame.pc = memory.fetchWord(0x06);
-			curCallFrame.routineStack = new Stack();
-			curCallFrame.numLocalVars = 0;
-			curCallFrame.callType = ZCallFrame.INTERRUPT; // This should never be examined.
-			curCallFrame.argCount = 0;
-			curCallFrame.frameNumber = 0;
-			callStack = new Stack();
+            this.curCallFrame = new ZCallFrame();
+            this.curCallFrame.pc = this.memory.fetchWord(0x06);
+            this.curCallFrame.routineStack = new Stack();
+            this.curCallFrame.numLocalVars = 0;
+            this.curCallFrame.callType = ZCallFrame.INTERRUPT; // This should never be examined.
+            this.curCallFrame.argCount = 0;
+            this.curCallFrame.frameNumber = 0;
+            this.callStack = new Stack();
 
 			// Now start executing code.  The
 			// return--if it does, we'll just return as well.
 			decodeLoop();
-		} while (restartFlag);
+		} while (this.restartFlag);
 
         return;
     }
@@ -330,162 +328,162 @@ public class ZCPU extends Object implements Runnable {
             // its own result, branch and string arguments using
             // utility functions.
 //			System.out.println(Integer.toHexString(curCallFrame.pc)); //db
-            curInstruction = memory.fetchByte(curCallFrame.pc);
-            curCallFrame.pc++;
+            this.curInstruction = this.memory.fetchByte(this.curCallFrame.pc);
+            this.curCallFrame.pc++;
 
             ///////////////////////////////////////////////////////////
             // Get the operands for this instruction, and type it.
             ///////////////////////////////////////////////////////////
-            if ((curInstruction >= 0x00) && (curInstruction <= 0x7f)) {
+            if (this.curInstruction >= 0x00 && this.curInstruction <= 0x7f) {
                 // A non-variable 2OP.
                 // Get first operand
-                if ((curInstruction & 0x40) == 0x40) { // A variable number
-                    v = memory.fetchByte(curCallFrame.pc);
-                    op1 = getVariable(v);
-                    op1type = ARGTYPE_WORD;
+                if ((this.curInstruction & 0x40) == 0x40) { // A variable number
+                    v = this.memory.fetchByte(this.curCallFrame.pc);
+                    this.op1 = getVariable(v);
+                    this.op1type = this.ARGTYPE_WORD;
                 }
                 else { // A byte constant
-                    op1 = memory.fetchByte(curCallFrame.pc);
-                    op1type = ARGTYPE_BYTE;
+                    this.op1 = this.memory.fetchByte(this.curCallFrame.pc);
+                    this.op1type = this.ARGTYPE_BYTE;
                 }
-                curCallFrame.pc++;
+                this.curCallFrame.pc++;
 
                 // Get second operand
-                if ((curInstruction & 0x20) == 0x20) { // A variable number
-                    v = memory.fetchByte(curCallFrame.pc);
-                    op2 = getVariable(v);
-                    op2type = ARGTYPE_WORD;
+                if ((this.curInstruction & 0x20) == 0x20) { // A variable number
+                    v = this.memory.fetchByte(this.curCallFrame.pc);
+                    this.op2 = getVariable(v);
+                    this.op2type = this.ARGTYPE_WORD;
                 }
                 else { // A byte constant
-                    op2 = memory.fetchByte(curCallFrame.pc);
-                    op2type = ARGTYPE_BYTE;
+                    this.op2 = this.memory.fetchByte(this.curCallFrame.pc);
+                    this.op2type = this.ARGTYPE_BYTE;
                 }
-                curCallFrame.pc++;
+                this.curCallFrame.pc++;
 
-                curOpcodeType = OPTYPE_2OP;
-                curOpcode = (curInstruction & 0x1f);
+                this.curOpcodeType = this.OPTYPE_2OP;
+                this.curOpcode = this.curInstruction & 0x1f;
             }
-            else if ((curInstruction >= 0x80) && (curInstruction <= 0xaf)) {
+            else if (this.curInstruction >= 0x80 && this.curInstruction <= 0xaf) {
                 // A 1OP.
-                switch (curInstruction & 0x30) {
+                switch (this.curInstruction & 0x30) {
                     case 0x00 : // A word constant
-                        op1 = memory.fetchWord(curCallFrame.pc);
-                        op1type = ARGTYPE_WORD;
-                        curCallFrame.pc += 2;
+                        this.op1 = this.memory.fetchWord(this.curCallFrame.pc);
+                        this.op1type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc += 2;
                         break;
                     case 0x10 : // A byte constant
-                        op1 = memory.fetchByte(curCallFrame.pc);
-                        op1type = ARGTYPE_BYTE;
-                        curCallFrame.pc++;
+                        this.op1 = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op1type = this.ARGTYPE_BYTE;
+                        this.curCallFrame.pc++;
                         break;
                     case 0x20 : // A variable
-                        v = memory.fetchByte(curCallFrame.pc);
-                        op1 = getVariable(v);
-                        op1type = ARGTYPE_WORD;
-                        curCallFrame.pc++;
+                        v = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op1 = getVariable(v);
+                        this.op1type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc++;
                         break;
                 }
 
-                curOpcodeType = OPTYPE_1OP;
-                curOpcode = (curInstruction & 0x0f);
+                this.curOpcodeType = this.OPTYPE_1OP;
+                this.curOpcode = this.curInstruction & 0x0f;
             }
-            else if ((curInstruction >= 0xb0) && (curInstruction <= 0xbf) &&
-                     (curInstruction != 0xbe)) {
+            else if (this.curInstruction >= 0xb0 && this.curInstruction <= 0xbf &&
+                this.curInstruction != 0xbe) {
                 // A 0OP.
-                curOpcodeType = OPTYPE_0OP;
-                curOpcode = (curInstruction & 0x0f);
+                this.curOpcodeType = this.OPTYPE_0OP;
+                this.curOpcode = this.curInstruction & 0x0f;
             }
-            else if ((curInstruction >= 0xc0) && (curInstruction <= 0xdf) &&
-                     (curInstruction != 0xc1)) {
+            else if (this.curInstruction >= 0xc0 && this.curInstruction <= 0xdf &&
+                this.curInstruction != 0xc1) {
                 // A variable 2OP.
                 // Get the type byte.
-                typebyte = memory.fetchByte(curCallFrame.pc);
-                curCallFrame.pc++;
+                typebyte = this.memory.fetchByte(this.curCallFrame.pc);
+                this.curCallFrame.pc++;
 
                 // Get the first operand
                 switch (typebyte & 0xc0) {
                     case 0x00 : // Word constant
-                        op1 = memory.fetchWord(curCallFrame.pc);
-                        op1type = ARGTYPE_WORD;
-                        curCallFrame.pc += 2;
+                        this.op1 = this.memory.fetchWord(this.curCallFrame.pc);
+                        this.op1type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc += 2;
                         break;
                     case 0x40 : // A byte constant
-                        op1 = memory.fetchByte(curCallFrame.pc);
-                        op1type = ARGTYPE_BYTE;
-                        curCallFrame.pc++;
+                        this.op1 = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op1type = this.ARGTYPE_BYTE;
+                        this.curCallFrame.pc++;
                         break;
                     case 0x80 : // A variable
-                        v = memory.fetchByte(curCallFrame.pc);
-                        op1 = getVariable(v);
-                        op1type = ARGTYPE_WORD;
-                        curCallFrame.pc++;
+                        v = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op1 = getVariable(v);
+                        this.op1type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc++;
                         break;
                     case 0xc0 : // An error
-                        zui.fatal("Error: Variable 2OP with no ops.");
+                        this.zui.fatal("Error: Variable 2OP with no ops.");
                 }
 
                 // Get the second operand
                 switch (typebyte & 0x30) {
                     case 0x00 : // Word constant
-                        op2 = memory.fetchWord(curCallFrame.pc);
-                        op2type = ARGTYPE_WORD;
-                        curCallFrame.pc += 2;
+                        this.op2 = this.memory.fetchWord(this.curCallFrame.pc);
+                        this.op2type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc += 2;
                         break;
                     case 0x10 : // A byte constant
-                        op2 = memory.fetchByte(curCallFrame.pc);
-                        op2type = ARGTYPE_BYTE;
-                        curCallFrame.pc++;
+                        this.op2 = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op2type = this.ARGTYPE_BYTE;
+                        this.curCallFrame.pc++;
                         break;
                     case 0x20 : // A variable
-                        v = memory.fetchByte(curCallFrame.pc);
-                        op2 = getVariable(v);
-                        op2type = ARGTYPE_WORD;
-                        curCallFrame.pc++;
+                        v = this.memory.fetchByte(this.curCallFrame.pc);
+                        this.op2 = getVariable(v);
+                        this.op2type = this.ARGTYPE_WORD;
+                        this.curCallFrame.pc++;
                         break;
                     case 0x30 : // An error
-                        zui.fatal("Error: Variable 2OP with one op.");
+                        this.zui.fatal("Error: Variable 2OP with one op.");
                 }
 
-                curOpcodeType = OPTYPE_2OP;
-                curOpcode = (curInstruction & 0x1f);
+                this.curOpcodeType = this.OPTYPE_2OP;
+                this.curOpcode = this.curInstruction & 0x1f;
             }
-            else if (((curInstruction >= 0xe0) && (curInstruction <= 0xff)) ||
-                     (curInstruction == 0xc1)) {
+            else if (this.curInstruction >= 0xe0 && this.curInstruction <= 0xff ||
+                this.curInstruction == 0xc1) {
                 // Variable instruction, or 0xc1 (JE with up to 4 operands)
                 // Get the operands
-                numvops = 0;
-                if ((curInstruction == 0xec) || (curInstruction == 0xfa)) {
+                this.numvops = 0;
+                if (this.curInstruction == 0xec || this.curInstruction == 0xfa) {
                     // Double-variables
-                    typebyte = memory.fetchWord(curCallFrame.pc);
-                    curCallFrame.pc += 2;
+                    typebyte = this.memory.fetchWord(this.curCallFrame.pc);
+                    this.curCallFrame.pc += 2;
                     maxops = 8;
                 }
                 else {
-                    typebyte = memory.fetchByte(curCallFrame.pc);
-                    curCallFrame.pc++;
+                    typebyte = this.memory.fetchByte(this.curCallFrame.pc);
+                    this.curCallFrame.pc++;
                     maxops = 4;
                 }
                 done = false;
-                for (int i=0;((i<maxops) && (!done));i++) {
-                    switch ((typebyte >> ((maxops-1-i)*2)) & 0x03) {
+                for (int i = 0; i<maxops && !done; i++) {
+                    switch (typebyte >> (maxops-1-i) *2 & 0x03) {
                         case 0x00 : // Word constant
-                            vops[i] = memory.fetchWord(curCallFrame.pc);
-                            voptypes[i] = ARGTYPE_WORD;
-                            curCallFrame.pc += 2;
-                            numvops++;
+                            this.vops[i] = this.memory.fetchWord(this.curCallFrame.pc);
+                            this.voptypes[i] = this.ARGTYPE_WORD;
+                            this.curCallFrame.pc += 2;
+                            this.numvops++;
                             break;
                         case 0x01 : // Byte constant
-                            vops[i] = memory.fetchByte(curCallFrame.pc);
-                            voptypes[i] = ARGTYPE_BYTE;
-                            curCallFrame.pc++;
-                            numvops++;
+                            this.vops[i] = this.memory.fetchByte(this.curCallFrame.pc);
+                            this.voptypes[i] = this.ARGTYPE_BYTE;
+                            this.curCallFrame.pc++;
+                            this.numvops++;
                             break;
                         case 0x02 : // A variable
-                            v = memory.fetchByte(curCallFrame.pc);
-                            vops[i] = getVariable(v);
-                            voptypes[i] = ARGTYPE_WORD;
-                            curCallFrame.pc++;
-                            numvops++;
+                            v = this.memory.fetchByte(this.curCallFrame.pc);
+                            this.vops[i] = getVariable(v);
+                            this.voptypes[i] = this.ARGTYPE_WORD;
+                            this.curCallFrame.pc++;
+                            this.numvops++;
                             break;
                         case 0x03 : // End of arguments
                             done = true;
@@ -493,45 +491,45 @@ public class ZCPU extends Object implements Runnable {
                     }
                 }
 
-                if (curInstruction == 0xc1) {
-                    curOpcodeType = OPTYPE_2OP;
-                    curOpcode = 0x01;
+                if (this.curInstruction == 0xc1) {
+                    this.curOpcodeType = this.OPTYPE_2OP;
+                    this.curOpcode = 0x01;
                 }
                 else {
-                    curOpcodeType = OPTYPE_VAR;
-                    curOpcode = (curInstruction & 0x1f);
+                    this.curOpcodeType = this.OPTYPE_VAR;
+                    this.curOpcode = this.curInstruction & 0x1f;
                 }
             }
-            else if (curInstruction == 0xbe) {
+            else if (this.curInstruction == 0xbe) {
                 // Extended instruction.  Decode similarly to a variable instruction.
-                curOpcodeType = OPTYPE_EXT;
-                curOpcode = memory.fetchByte(curCallFrame.pc);
-                curCallFrame.pc++;
+                this.curOpcodeType = this.OPTYPE_EXT;
+                this.curOpcode = this.memory.fetchByte(this.curCallFrame.pc);
+                this.curCallFrame.pc++;
 
-                numvops = 0;
-                typebyte = memory.fetchByte(curCallFrame.pc);
-                curCallFrame.pc++;
+                this.numvops = 0;
+                typebyte = this.memory.fetchByte(this.curCallFrame.pc);
+                this.curCallFrame.pc++;
                 done = false;
-                for (int i=0;((i<4) && (!done));i++) {
-                    switch ((typebyte >> ((3-i)*2)) & 0x03) {
+                for (int i = 0; i<4 && !done; i++) {
+                    switch (typebyte >> (3-i) *2 & 0x03) {
                         case 0x00 : // Word constant
-                            vops[i] = memory.fetchWord(curCallFrame.pc);
-                            voptypes[i] = ARGTYPE_WORD;
-                            curCallFrame.pc += 2;
-                            numvops++;
+                            this.vops[i] = this.memory.fetchWord(this.curCallFrame.pc);
+                            this.voptypes[i] = this.ARGTYPE_WORD;
+                            this.curCallFrame.pc += 2;
+                            this.numvops++;
                             break;
                         case 0x01 : // Byte constant
-                            vops[i] = memory.fetchByte(curCallFrame.pc);
-                            voptypes[i] = ARGTYPE_BYTE;
-                            curCallFrame.pc++;
-                            numvops++;
+                            this.vops[i] = this.memory.fetchByte(this.curCallFrame.pc);
+                            this.voptypes[i] = this.ARGTYPE_BYTE;
+                            this.curCallFrame.pc++;
+                            this.numvops++;
                             break;
                         case 0x02 : // A variable
-                            v = memory.fetchByte(curCallFrame.pc);
-                            vops[i] = getVariable(v);
-                            voptypes[i] = ARGTYPE_WORD;
-                            curCallFrame.pc++;
-                            numvops++;
+                            v = this.memory.fetchByte(this.curCallFrame.pc);
+                            this.vops[i] = getVariable(v);
+                            this.voptypes[i] = this.ARGTYPE_WORD;
+                            this.curCallFrame.pc++;
+                            this.numvops++;
                             break;
                         case 0x03 : // End of arguments
                             done = true;
@@ -541,14 +539,14 @@ public class ZCPU extends Object implements Runnable {
             }
             else
                 // This should never happen.
-                zui.fatal("Malformed instruction: " + curInstruction);
+                this.zui.fatal("Malformed instruction: " + this.curInstruction);
 
             ///////////////////////////////////////////////////////////
             // Dispatch the instruction.
             ///////////////////////////////////////////////////////////
-            if (curOpcodeType == OPTYPE_0OP) {
+            if (this.curOpcodeType == this.OPTYPE_0OP) {
                 // 0OP opcodes.
-                switch (curOpcode) {
+                switch (this.curOpcode) {
                     case 0x00 : zop_rtrue();
                                 break;
                     case 0x01 : zop_rfalse();
@@ -561,27 +559,27 @@ public class ZCPU extends Object implements Runnable {
                                 break;
                     case 0x04 : zop_nop();
                                 break;
-                    case 0x05 : if (version < 4)
+                    case 0x05 : if (this.version < 4)
                                     getBranch();
-                                else if (version == 4)
+                                else if (this.version == 4)
                                     getResult();
                                 else
-                                    zui.fatal("SAVE 0OP unsupported after version 4.");
+                        this.zui.fatal("SAVE 0OP unsupported after version 4.");
                                 zop_save();
                                 break;
-                    case 0x06 : if (version < 4)
+                    case 0x06 : if (this.version < 4)
                                     getBranch();
-                                else if (version == 4)
+                                else if (this.version == 4)
                                     getResult();
                                 else
-                                    zui.fatal("RESTORE 0OP unsupported after version 4.");
+                        this.zui.fatal("RESTORE 0OP unsupported after version 4.");
                                 zop_restore();
                                 break;
                     case 0x07 : zop_restart();
                                 break;
                     case 0x08 : zop_ret_pulled();
                                 break;
-                    case 0x09 : if (version < 5)
+                    case 0x09 : if (this.version < 5)
                                     zop_pop();
                                 else {
                                     getResult();
@@ -598,16 +596,17 @@ public class ZCPU extends Object implements Runnable {
                                 zop_verify();
                                 break;
                     case 0x0e : // Start of extended instruction
-                                zui.fatal("Found opcode 0xBE in 0OP dispatcher");
+                        this.zui.fatal("Found opcode 0xBE in 0OP dispatcher");
                     case 0x0f : getBranch();
                                 zop_piracy();
                                 break;
-                    default : zui.fatal("Unknown 0OP - probably a bug.");
+                    default :
+                        this.zui.fatal("Unknown 0OP - probably a bug.");
                 }
             }
-            else if (curOpcodeType == OPTYPE_1OP) {
+            else if (this.curOpcodeType == this.OPTYPE_1OP) {
                 // 1OP opcodes
-                switch (curOpcode) {
+                switch (this.curOpcode) {
                     case 0x00 : getBranch();
                                 zop_jz();
                                 break;
@@ -647,20 +646,22 @@ public class ZCPU extends Object implements Runnable {
                     case 0x0e : getResult();
                                 zop_load();
                                 break;
-                    case 0x0f : if (version < 5) {
+                    case 0x0f : if (this.version < 5) {
                                     getResult();
                                     zop_not();
                                 }
                                 else
                                     zop_call_p0();
 								break;
-                    default : zui.fatal("Unknown 1OP - probably a bug.");
+                    default :
+                        this.zui.fatal("Unknown 1OP - probably a bug.");
                 }
             }
-            else if (curOpcodeType == OPTYPE_2OP) {
+            else if (this.curOpcodeType == this.OPTYPE_2OP) {
                 // 2OP opcodes
-                switch (curOpcode) {
-                    case 0x00 : zui.fatal("Unspecified instruction: " + curInstruction);
+                switch (this.curOpcode) {
+                    case 0x00 :
+                        this.zui.fatal("Unspecified instruction: " + this.curInstruction);
                     case 0x01 : getBranch();
                                 zop_je();
                                 break;
@@ -740,13 +741,15 @@ public class ZCPU extends Object implements Runnable {
                                 break;
                     case 0x1d :
                     case 0x1e :
-                    case 0x1f : zui.fatal("Unspecified instruction: " + curInstruction);
-                    default : zui.fatal("Unknown 2OP.  Probably a bug.");
+                    case 0x1f :
+                        this.zui.fatal("Unspecified instruction: " + this.curInstruction);
+                    default :
+                        this.zui.fatal("Unknown 2OP.  Probably a bug.");
                 }
             }
-            else if (curOpcodeType == OPTYPE_VAR) {
+            else if (this.curOpcodeType == this.OPTYPE_VAR) {
                 // VAR instructions
-                switch (curOpcode) {
+                switch (this.curOpcode) {
                     case 0x00 : getResult();
                                 zop_call_fv();
                                 break;
@@ -756,7 +759,7 @@ public class ZCPU extends Object implements Runnable {
                                 break;
                     case 0x03 : zop_put_prop();
                                 break;
-                    case 0x04 : if (version >= 5)
+                    case 0x04 : if (this.version >= 5)
                                     getResult();
                                 zop_read();
                                 break;
@@ -804,8 +807,8 @@ public class ZCPU extends Object implements Runnable {
                                 zop_scan_table();
                                 break;
                     case 0x18 : getResult();
-                                op1 = vops[0];
-                                op1type = voptypes[0];
+                        this.op1 = this.vops[0];
+                        this.op1type = this.voptypes[0];
                                 zop_not();
                                 break;
                     case 0x19 : zop_call_pv();
@@ -823,12 +826,13 @@ public class ZCPU extends Object implements Runnable {
                     case 0x1f : getBranch();
                                 zop_check_arg_count();
                                 break;
-                    default : zui.fatal("Unknown VAR - probably a bug.");
+                    default :
+                        this.zui.fatal("Unknown VAR - probably a bug.");
                 }
             }
-            else if (curOpcodeType == OPTYPE_EXT) {
+            else if (this.curOpcodeType == this.OPTYPE_EXT) {
                 // Extended instructions
-                switch (curOpcode) {
+                switch (this.curOpcode) {
                     case 0x00 : getResult();
                                 zop_ext_save();
                                 break;
@@ -863,7 +867,8 @@ public class ZCPU extends Object implements Runnable {
                     case 0x0c :
                     case 0x0d :
                     case 0x0e :
-                    case 0x0f : zui.fatal("Unspecified EXT instruction: " + curOpcode);
+                    case 0x0f :
+                        this.zui.fatal("Unspecified EXT instruction: " + this.curOpcode);
                     case 0x10 : zop_move_window();
                                 break;
                     case 0x11 : zop_window_size();
@@ -893,20 +898,21 @@ public class ZCPU extends Object implements Runnable {
                                 break;
                     case 0x1c : zop_picture_table();
                                 break;
-                    default : zui.fatal("Unspecified EXT instruction: " + curOpcode);
+                    default :
+                        this.zui.fatal("Unspecified EXT instruction: " + this.curOpcode);
                 }
             }
             else
-                zui.fatal("Unknown instruction: " + curInstruction);
+                this.zui.fatal("Unknown instruction: " + this.curInstruction);
 
-            if (decode_ret_flag) {
+            if (this.decode_ret_flag) {
                 // An instruction has indicated that this decodeLoop
                 // should return.
-                decode_ret_flag = false;
+                this.decode_ret_flag = false;
                 return;
             }
 
-			if (restartFlag)
+			if (this.restartFlag)
 				return; // Also return during a restart
         }
     }
@@ -928,47 +934,45 @@ public class ZCPU extends Object implements Runnable {
         int sval;
 
         // Get the first byte of the branch
-        b1 = memory.fetchByte(curCallFrame.pc);
-        curCallFrame.pc++;
+        b1 = this.memory.fetchByte(this.curCallFrame.pc);
+        this.curCallFrame.pc++;
 
         // Check to see if logic is reversed
-        if ((b1 & 0x80) == 0x80)
-            curBranchReversed = false;
-        else
-            curBranchReversed = true;
+        this.curBranchReversed = (b1 & 0x80) != 0x80;
 
         // If the branch is only one byte long, just set its
         // value and return.
         if ((b1 & 0x40) == 0x40) {
-            curBranch = (b1 & 0x3f);
+            this.curBranch = b1 & 0x3f;
             return;
         }
 
         // Otherwise, construct a signed branch value.
-        b2 = memory.fetchByte(curCallFrame.pc);
-        curCallFrame.pc++;
-        sval = (((((b1 & 0x3f) << 8) & 0x3f00) | b2) & 0x3fff);
+        b2 = this.memory.fetchByte(this.curCallFrame.pc);
+        this.curCallFrame.pc++;
+        sval = ((b1 & 0x3f) << 8 & 0x3f00 | b2) & 0x3fff;
         // If the following makes no sense, see the Z-Machine spec
         // on signed numbers.
         if ((sval & 0x2000) == 0x2000)
-            curBranch = (sval - 16384);
+            this.curBranch = sval - 16384;
         else
-            curBranch = sval;
+            this.curBranch = sval;
     }
 
     // Do a branch, based on the values of curBranch and
     // curBranchReversed.
     private void doBranch()
     {
-        if (curBranchReversed)
+        if (this.curBranchReversed)
             return;
         else {
-            switch (curBranch) {
+            switch (this.curBranch) {
                 case 0 : zop_rfalse();
                          break;
                 case 1 : zop_rtrue();
                          break;
-                default : curCallFrame.pc = curCallFrame.pc + curBranch - 2;
+                default :
+                    this.curCallFrame.pc = this.curCallFrame.pc + this.curBranch - 2;
                           break;
             }
             return;
@@ -980,13 +984,14 @@ public class ZCPU extends Object implements Runnable {
     // implies a branch).
     private void dontBranch()
     {
-        if (curBranchReversed) {
-            switch (curBranch) {
+        if (this.curBranchReversed) {
+            switch (this.curBranch) {
                 case 0 : zop_rfalse();
                          break;
                 case 1 : zop_rtrue();
                          break;
-                default : curCallFrame.pc = curCallFrame.pc + curBranch - 2;
+                default :
+                    this.curCallFrame.pc = this.curCallFrame.pc + this.curBranch - 2;
                           break;
             }
             return;
@@ -1001,8 +1006,8 @@ public class ZCPU extends Object implements Runnable {
     // this is called; it is adjusted accordingly.
     private void getResult()
     {
-        curResult = memory.fetchByte(curCallFrame.pc);
-        curCallFrame.pc++;
+        this.curResult = this.memory.fetchByte(this.curCallFrame.pc);
+        this.curCallFrame.pc++;
     }
 
     // This method gets the <string> argument of the current
@@ -1014,14 +1019,14 @@ public class ZCPU extends Object implements Runnable {
         int w;
 
         // First, decode the string
-        curString = decodeZString(curCallFrame.pc);
+        this.curString = decodeZString(this.curCallFrame.pc);
 
         // Now, adjust the PC.
-        w = memory.fetchWord(curCallFrame.pc);
-        curCallFrame.pc += 2;
+        w = this.memory.fetchWord(this.curCallFrame.pc);
+        this.curCallFrame.pc += 2;
         while ((w & 0x8000) == 0) {
-            w = memory.fetchWord(curCallFrame.pc);
-            curCallFrame.pc += 2;
+            w = this.memory.fetchWord(this.curCallFrame.pc);
+            this.curCallFrame.pc += 2;
         }
     }
 
@@ -1043,7 +1048,7 @@ public class ZCPU extends Object implements Runnable {
 		tmpaddr = addr;
 		zlen = 0;
 		do {
-			w = memory.fetchWord(tmpaddr);
+			w = this.memory.fetchWord(tmpaddr);
 			tmpaddr += 2;
 			zlen += 3;
 		} while ((w & 0x8000) != 0x8000);
@@ -1051,18 +1056,18 @@ public class ZCPU extends Object implements Runnable {
 		zchars = new int[zlen];
 		curindex = 0;
         tmpaddr = addr;
-        w = memory.fetchWord(tmpaddr);
+        w = this.memory.fetchWord(tmpaddr);
         tmpaddr += 2;
-        zchars[curindex] = ((w >> 10) & 0x1f);
-        zchars[curindex+1] = ((w >> 5) & 0x1f);
-        zchars[curindex+2] = (w & 0x1f);
+        zchars[curindex] = w >> 10 & 0x1f;
+        zchars[curindex+1] = w >> 5 & 0x1f;
+        zchars[curindex+2] = w & 0x1f;
 		curindex += 3;
         while ((w & 0x8000) == 0) {
-            w = memory.fetchWord(tmpaddr);
+            w = this.memory.fetchWord(tmpaddr);
             tmpaddr += 2;
-            zchars[curindex] = ((w >> 10) & 0x1f);
-            zchars[curindex+1] = ((w >> 5) & 0x1f);
-            zchars[curindex+2] = (w & 0x1f);
+            zchars[curindex] = w >> 10 & 0x1f;
+            zchars[curindex+1] = w >> 5 & 0x1f;
+            zchars[curindex+2] = w & 0x1f;
 			curindex += 3;
         }
 
@@ -1070,15 +1075,15 @@ public class ZCPU extends Object implements Runnable {
         c = 0;
         c2 = 0;
         c3 = 0;
-        currentAlphabet = alphabetL;
-        lockAlphabet = alphabetL;
+        currentAlphabet = this.alphabetL;
+        lockAlphabet = this.alphabetL;
         for (int i=0;i < zlen;i++) {
 			c = (char)zchars[i];
             // Decode character -- handle special characters as
             // necessary.  A bit of code is repeated here for
             // the sake of cutting down on the number of comparisons.
             switch (c) {
-                case 1 : if (version == 1) { // Newline in V1
+                case 1 : if (this.version == 1) { // Newline in V1
                             decodedstr.append("\n");
                             currentAlphabet = lockAlphabet;
                          }
@@ -1087,14 +1092,14 @@ public class ZCPU extends Object implements Runnable {
 							if (i >= zlen) // This is all we're getting.
 								break;
                             c2 = (char)zchars[i];
-                            abbrevAddr = memory.fetchWord(abbrevTable + (((((int)c) - 1) * 32 + ((int)c2)) * 2));
+                            abbrevAddr = this.memory.fetchWord(this.abbrevTable + (((int)c - 1) * 32 + (int)c2) * 2);
                             abbrevAddr *= 2; // Word address
                             decodedstr.append(decodeZString(abbrevAddr));
                          }
                          break;
-                case 2 : if (version <= 2) { // Shift up
-                            if (currentAlphabet == alphabetP)
-                                currentAlphabet = alphabetL;
+                case 2 : if (this.version <= 2) { // Shift up
+                            if (currentAlphabet == this.alphabetP)
+                                currentAlphabet = this.alphabetL;
                             else
                                 currentAlphabet++;
                          }
@@ -1103,49 +1108,49 @@ public class ZCPU extends Object implements Runnable {
 							if (i >= zlen)
 								break;
                             c2 = (char)zchars[i];
-                            abbrevAddr = memory.fetchWord(abbrevTable + (((((int)c) - 1) * 32 + ((int)c2)) * 2));
+                            abbrevAddr = this.memory.fetchWord(this.abbrevTable + (((int)c - 1) * 32 + (int)c2) * 2);
                             abbrevAddr *= 2; // Word address
                             decodedstr.append(decodeZString(abbrevAddr));
                          }
                          break;
-                case 3 : if (version <= 2) { // Shift down
-                            if (currentAlphabet == alphabetL)
-                                currentAlphabet = alphabetP;
-                            else if (currentAlphabet == alphabetP)
-                                currentAlphabet = alphabetU;
+                case 3 : if (this.version <= 2) { // Shift down
+                            if (currentAlphabet == this.alphabetL)
+                                currentAlphabet = this.alphabetP;
+                            else if (currentAlphabet == this.alphabetP)
+                                currentAlphabet = this.alphabetU;
                             else
-                                currentAlphabet = alphabetL;
+                                currentAlphabet = this.alphabetL;
                          }
                          else { // Abbreviation
                             i++;
 							if (i >= zlen)
 								break;
                             c2 = (char)zchars[i];
-                            abbrevAddr = memory.fetchWord(abbrevTable + (((((int)c) - 1) * 32 + ((int)c2)) * 2));
+                            abbrevAddr = this.memory.fetchWord(this.abbrevTable + (((int)c - 1) * 32 + (int)c2) * 2);
                             abbrevAddr *= 2; // Word address
                             decodedstr.append(decodeZString(abbrevAddr));
                          }
                          break;
                 case 4 : // Always a shift up
-                         if (currentAlphabet == alphabetP)
-                             currentAlphabet = alphabetL;
+                         if (currentAlphabet == this.alphabetP)
+                             currentAlphabet = this.alphabetL;
                          else
                              currentAlphabet++;
-                         if (version <= 2)
+                         if (this.version <= 2)
                              lockAlphabet = currentAlphabet;
                          break;
                 case 5 : // Always a shift down
-                         if (currentAlphabet == alphabetL)
-                             currentAlphabet = alphabetP;
-                         else if (currentAlphabet == alphabetP)
-                             currentAlphabet = alphabetU;
+                         if (currentAlphabet == this.alphabetL)
+                             currentAlphabet = this.alphabetP;
+                         else if (currentAlphabet == this.alphabetP)
+                             currentAlphabet = this.alphabetU;
                          else
-                             currentAlphabet = alphabetL;
-                         if (version <= 2)
+                             currentAlphabet = this.alphabetL;
+                         if (this.version <= 2)
                             lockAlphabet = currentAlphabet;
                          break;
                 case 6 : // Literal output character if alphabet is P.
-						 if (currentAlphabet == alphabetP) {
+						 if (currentAlphabet == this.alphabetP) {
 		                    i++;
 							if (i >= zlen)
 								break;
@@ -1154,16 +1159,16 @@ public class ZCPU extends Object implements Runnable {
 							if (i >= zlen)
 								break;
 							c3 = (char)zchars[i];
-				            w = ((((int)c2 << 5) & 0x03e0) | ((int)c3 & 0x1f));
+				            w = (int)c2 << 5 & 0x03e0 | (int)c3 & 0x1f;
 					        decodedstr.append(String.valueOf((char)w));
 							currentAlphabet = lockAlphabet;
 						 }
 						 else {
-							 decodedstr.append(String.valueOf(alphabet[currentAlphabet][(int)c]));
+							 decodedstr.append(String.valueOf(this.alphabet[currentAlphabet][(int)c]));
 							 currentAlphabet = lockAlphabet;
 						 }
 						 break;
-                default : decodedstr.append(String.valueOf(alphabet[currentAlphabet][(int)c]));
+                default : decodedstr.append(String.valueOf(this.alphabet[currentAlphabet][(int)c]));
                           currentAlphabet = lockAlphabet;
                           break;
             }
@@ -1191,30 +1196,30 @@ public class ZCPU extends Object implements Runnable {
 			curchar = text.charAt(curtextindex);
 
 			// First, try some shortcuts if we're not using an alternate character set.
-			if (!altCharSet) {
+			if (!this.altCharSet) {
 				if (Character.isLowerCase(curchar)) { // Alphabet L
-					outbuf.addElement(new Integer(((int)((curchar - 'a') + 6))));
+					outbuf.addElement(new Integer(curchar - 'a' + 6));
 					continue;
 				}
 				else if (Character.isUpperCase(curchar)) {
-					if (version < 3)
+					if (this.version < 3)
 						outbuf.addElement(new Integer(2));
 					else
 						outbuf.addElement(new Integer(4));
-					outbuf.addElement(new Integer(((int)((curchar - 'A') + 6))));
+					outbuf.addElement(new Integer(curchar - 'A' + 6));
 					continue;
 				}
 			}
 
 			// If the character is a cr or lf, encode it as a newline.
-			if ((curchar == '\r') || (curchar == '\n')) {
-				if (version == 1) { // Only needs one character in V1
+			if (curchar == '\r' || curchar == '\n') {
+				if (this.version == 1) { // Only needs one character in V1
 					outbuf.addElement(new Integer(1));
 					continue;
 				}
 
 				// Otherwise, two bytes are needed.
-				if (version < 3)
+				if (this.version < 3)
 					outbuf.addElement(new Integer(3));
 				else
 					outbuf.addElement(new Integer(5));
@@ -1225,21 +1230,21 @@ public class ZCPU extends Object implements Runnable {
 			// See if the character is in each alphabet.  This means either it's
 			// punctuation or we have an alternate character set.
 			found = false;
-			for (i=6;(i<32);i++) {
-				if (alphabet[alphabetL][i] == curchar) {
+			for (i=6; i<32; i++) {
+				if (this.alphabet[this.alphabetL][i] == curchar) {
 					outbuf.addElement(new Integer(i));
 					found = true;
 				}
-				else if (alphabet[alphabetU][i] == curchar) {
-					if (version < 3)
+				else if (this.alphabet[this.alphabetU][i] == curchar) {
+					if (this.version < 3)
 						outbuf.addElement(new Integer(2));
 					else
 						outbuf.addElement(new Integer(4));
 					outbuf.addElement(new Integer(i));
 					found = true;
 				}
-				else if (alphabet[alphabetP][i] == curchar) {
-					if (version < 3)
+				else if (this.alphabet[this.alphabetP][i] == curchar) {
+					if (this.version < 3)
 						outbuf.addElement(new Integer(3));
 					else
 						outbuf.addElement(new Integer(5));
@@ -1252,13 +1257,13 @@ public class ZCPU extends Object implements Runnable {
 			if (found)
 				continue;
 
-			if (version < 3) // Shift to alphabetP
+			if (this.version < 3) // Shift to alphabetP
 				outbuf.addElement(new Integer(3));
 			else
 				outbuf.addElement(new Integer(5));
 			outbuf.addElement(new Integer(6)); // Literal escape
-			outbuf.addElement(new Integer(((((int)curchar) >> 5) & 0x1f))); // Top 5 bits
-			outbuf.addElement(new Integer(((int)curchar) & 0x1f)); // Bottom 5 bits
+			outbuf.addElement(new Integer((int)curchar >> 5 & 0x1f)); // Top 5 bits
+			outbuf.addElement(new Integer((int)curchar & 0x1f)); // Bottom 5 bits
 		}
 
 		// Return the encoded string.
@@ -1272,24 +1277,24 @@ public class ZCPU extends Object implements Runnable {
     private int getVariable(int v)
     {
         if (v == 0) { // The top of the routine stack
-            if (curCallFrame.routineStack.empty())
-                zui.fatal("Routine stack underflow");
+            if (this.curCallFrame.routineStack.empty())
+                this.zui.fatal("Routine stack underflow");
             else {
-                Integer i = (Integer)curCallFrame.routineStack.pop();
-                return (i.intValue());
+                Integer i = (Integer) this.curCallFrame.routineStack.pop();
+                return i.intValue();
             }
         }
-        else if ((v >= 1) && (v <= 15)) // Local variable
+        else if (v >= 1 && v <= 15) // Local variable
             // We don't bother checking whether the variable
             // exists -- the caller just gets a 0 if a non-existant
             // local variable is referenced.
-            return (curCallFrame.localVars[v-1]);
-        else if ((v >= 16) && (v <= 255)) // Global variable
-            return (memory.fetchWord(globalVars + ((v - 16) * 2)));
+            return this.curCallFrame.localVars[v-1];
+        else if (v >= 16 && v <= 255) // Global variable
+            return this.memory.fetchWord(this.globalVars + (v - 16) * 2);
 
         // If we get here, something's wrong.
-        zui.fatal("Unspecified variable referenced");
-        return(0); // To make javac happy
+        this.zui.fatal("Unspecified variable referenced");
+        return 0; // To make javac happy
     }
 
     // This function handles requests to put the value of a variable,
@@ -1299,16 +1304,16 @@ public class ZCPU extends Object implements Runnable {
         value = value & 0xffff;
         if (v == 0) { // Push this value onto the routine stack
             Integer i = new Integer(value);
-            curCallFrame.routineStack.push(i);
+            this.curCallFrame.routineStack.push(i);
         }
-        else if ((v >= 1) && (v <= 15)) // Local variable
+        else if (v >= 1 && v <= 15) // Local variable
             // Again, we don't bother checking the validity of
             // the local variable number.
-            curCallFrame.localVars[v-1] = value;
-        else if ((v >= 16) && (v <= 255)) // Global variable
-            memory.putWord((globalVars + ((v - 16) * 2)),value);
+            this.curCallFrame.localVars[v-1] = value;
+        else if (v >= 16 && v <= 255) // Global variable
+            this.memory.putWord(this.globalVars + (v - 16) * 2,value);
         else
-            zui.fatal("Unspecified variable referenced");
+            this.zui.fatal("Unspecified variable referenced");
     }
 
     // Unpack a packed address.  raddr is true if this is a routine
@@ -1318,7 +1323,7 @@ public class ZCPU extends Object implements Runnable {
         int addr = 0;
         int offset = 0;
 
-        switch (version) {
+        switch (this.version) {
             case 1 :
             case 2 :
             case 3 : addr = 2 * paddr;
@@ -1328,10 +1333,10 @@ public class ZCPU extends Object implements Runnable {
                      break;
             case 6 :
             case 7 : if (raddr)
-                        offset = memory.fetchWord(0x28);
+                        offset = this.memory.fetchWord(0x28);
                      else
-                        offset = memory.fetchWord(0x2a);
-                     addr = (4 * addr) + (8 * offset);
+                        offset = this.memory.fetchWord(0x2a);
+                     addr = 4 * addr + 8 * offset;
                      break;
             case 8 : addr = 8 * paddr;
                      break;
@@ -1344,9 +1349,9 @@ public class ZCPU extends Object implements Runnable {
     private int signedWord(int w)
     {
         if ((w & 0x8000) == 0x8000)
-            return (w - 65536);
+            return w - 65536;
         else
-            return (w);
+            return w;
     }
 
     // Encode a signed word
@@ -1354,9 +1359,9 @@ public class ZCPU extends Object implements Runnable {
     {
         w = w & 0xffff;
         if (w < 0)
-            return (65536-(-w));
+            return 65536- -w;
         else
-            return (w);
+            return w;
     }
 
     // Call the routine at the given routine address as an interrupt.
@@ -1369,49 +1374,49 @@ public class ZCPU extends Object implements Runnable {
         
         // Unpack the routine address and get number of local variables
         addr = unpackAddr(raddr,true);
-        numvars = memory.fetchByte(addr);
+        numvars = this.memory.fetchByte(addr);
         addr++;
         
         // Get a number for the new frame
-        newFrameAddr = curCallFrame.frameNumber + 1;
+        newFrameAddr = this.curCallFrame.frameNumber + 1;
         
         // Push the current call frame onto the stack
-        callStack.push(curCallFrame);
+        this.callStack.push(this.curCallFrame);
         
         // Initialize a new call frame
-        curCallFrame = new ZCallFrame();
+        this.curCallFrame = new ZCallFrame();
         
         // Set pc to the beginning of the routine's code
-        if (version < 5)
-            curCallFrame.pc = addr + (numvars * 2);
+        if (this.version < 5)
+            this.curCallFrame.pc = addr + numvars * 2;
         else
-            curCallFrame.pc = addr;
+            this.curCallFrame.pc = addr;
         
         // Get a new routine stack
-        curCallFrame.routineStack = new Stack();
+        this.curCallFrame.routineStack = new Stack();
         
         // Initialize local variables
         for (int i=0;i<numvars;i++) {
-            if (version < 5)
-                curCallFrame.localVars[i] = memory.fetchWord(addr + (i*2));
+            if (this.version < 5)
+                this.curCallFrame.localVars[i] = this.memory.fetchWord(addr + i*2);
             else
-                curCallFrame.localVars[i] = 0;
+                this.curCallFrame.localVars[i] = 0;
         }
         
         // Indicate that this routine was called as an interrupt
-        curCallFrame.callType = ZCallFrame.INTERRUPT;
+        this.curCallFrame.callType = ZCallFrame.INTERRUPT;
         
         // No arguments
-        curCallFrame.argCount = 0;
+        this.curCallFrame.argCount = 0;
         
         // Store frame number
-        curCallFrame.frameNumber = newFrameAddr;
+        this.curCallFrame.frameNumber = newFrameAddr;
         
         // Now call decodeLoop recursively.
         decodeLoop();
         
         // When we're done, ret_value will contain the routine's return value.
-        return ret_value;
+        return this.ret_value;
     }
     
 	// Save the state of the Z-Machine--that is, the current call frame
@@ -1424,21 +1429,21 @@ public class ZCPU extends Object implements Runnable {
 		ZCallFrame thisframe;
 
 		// First, save the current call frame.
-		dos.writeInt(curCallFrame.pc);
+		dos.writeInt(this.curCallFrame.pc);
 		for (i=0;i<15;i++)
-			dos.writeInt(curCallFrame.localVars[i]);
-		dos.writeInt(curCallFrame.numLocalVars);
-		dos.writeInt(curCallFrame.callType);
-		dos.writeInt(curCallFrame.argCount);
-		dos.writeInt(curCallFrame.frameNumber);
-		dumpStack(dos,curCallFrame.routineStack);
+			dos.writeInt(this.curCallFrame.localVars[i]);
+		dos.writeInt(this.curCallFrame.numLocalVars);
+		dos.writeInt(this.curCallFrame.callType);
+		dos.writeInt(this.curCallFrame.argCount);
+		dos.writeInt(this.curCallFrame.frameNumber);
+		dumpStack(dos, this.curCallFrame.routineStack);
 
 		// Now, to save things in the proper order, we deconstruct the original
 		// call stack and put in in a new stack, in reverse order.  It is
 		// reconstructed as it is written out.
 		tmpstack = new Stack();
-		while (!callStack.empty()) {
-			tmpstack.push(callStack.pop());
+		while (!this.callStack.empty()) {
+			tmpstack.push(this.callStack.pop());
 			n++;
 		}
 
@@ -1454,7 +1459,7 @@ public class ZCPU extends Object implements Runnable {
 			dos.writeInt(thisframe.argCount);
 			dos.writeInt(thisframe.frameNumber);
 			dumpStack(dos,thisframe.routineStack);
-			callStack.push(thisframe);
+            this.callStack.push(thisframe);
 		}
 	}
 
@@ -1466,19 +1471,19 @@ public class ZCPU extends Object implements Runnable {
 		ZCallFrame thisframe;
 
 		// Get the current call frame
-		curCallFrame = new ZCallFrame();
-		curCallFrame.pc = dis.readInt();
+        this.curCallFrame = new ZCallFrame();
+        this.curCallFrame.pc = dis.readInt();
 		for (i=0;i<15;i++)
-			curCallFrame.localVars[i] = dis.readInt();
-		curCallFrame.numLocalVars = dis.readInt();
-		curCallFrame.callType = dis.readInt();
-		curCallFrame.argCount = dis.readInt();
-		curCallFrame.frameNumber = dis.readInt();
-		curCallFrame.routineStack = new Stack();
-		readStack(dis,curCallFrame.routineStack);
+            this.curCallFrame.localVars[i] = dis.readInt();
+        this.curCallFrame.numLocalVars = dis.readInt();
+        this.curCallFrame.callType = dis.readInt();
+        this.curCallFrame.argCount = dis.readInt();
+        this.curCallFrame.frameNumber = dis.readInt();
+        this.curCallFrame.routineStack = new Stack();
+		readStack(dis, this.curCallFrame.routineStack);
 
 		// Now get the call stack
-		callStack = new Stack();
+        this.callStack = new Stack();
 		nframes = dis.readInt();
 		for (j=0;j<nframes;j++) {
 			thisframe = new ZCallFrame();
@@ -1491,7 +1496,7 @@ public class ZCPU extends Object implements Runnable {
 			thisframe.frameNumber = dis.readInt();
 			thisframe.routineStack = new Stack();
 			readStack(dis,thisframe.routineStack);
-			callStack.push(thisframe);
+            this.callStack.push(thisframe);
 		}
 	}
 
@@ -1555,7 +1560,7 @@ public class ZCPU extends Object implements Runnable {
     private void zop_rtrue()
     {
         // This is equivalent to RET 1
-        op1 = 1;
+        this.op1 = 1;
         zop_ret();
     }
 
@@ -1563,7 +1568,7 @@ public class ZCPU extends Object implements Runnable {
     private void zop_rfalse()
     {
         // This is equivalent to RET 0
-        op1 = 0;
+        this.op1 = 0;
         zop_ret();
     }
 
@@ -1574,7 +1579,7 @@ public class ZCPU extends Object implements Runnable {
         // of PRINT_CHAR instructions were executed.  However,
         // we output an entire string at a time for maximum
         // drawing efficiency.
-        ioCard.printString(curString);
+        this.ioCard.printString(this.curString);
     }
 
     // PRINT_RTRUE <string>
@@ -1601,12 +1606,12 @@ public class ZCPU extends Object implements Runnable {
 		DataOutputStream dos;
 
 		// Get a filename to save under
-		fn = zui.getFilename("Save Game",null,true);
+		fn = this.zui.getFilename("Save Game",null,true);
 		if (fn == null) { // An error-probably user cancelled.
-			if (version <= 3)
+			if (this.version <= 3)
 				dontBranch();
 			else
-				putVariable(curResult,0);
+				putVariable(this.curResult,0);
 			return;
 		}
 
@@ -1614,22 +1619,22 @@ public class ZCPU extends Object implements Runnable {
 			fos = new FileOutputStream(fn);
 			dos = new DataOutputStream(fos);
 			dumpState(dos);
-			memory.dumpMemory(dos,0,dynamicMemorySize);
+            this.memory.dumpMemory(dos,0, this.dynamicMemorySize);
 			fos.close();
 		}
 		catch (IOException ex1) {
-			if (version <= 3)
+			if (this.version <= 3)
 				dontBranch();
 			else
-				putVariable(curResult,0);
+				putVariable(this.curResult,0);
 			return;
 		}
 
 		// We did it!
-		if (version <= 3)
+		if (this.version <= 3)
 			doBranch();
 		else
-			putVariable(curResult,1);
+			putVariable(this.curResult,1);
     }
 
     // RESTORE <branch>  V1-3
@@ -1642,34 +1647,34 @@ public class ZCPU extends Object implements Runnable {
 		int tsBit;
 
 		// Get a filename to restore from
-		fn = zui.getFilename("Restore Game",null,false);
+		fn = this.zui.getFilename("Restore Game",null,false);
 		if (fn == null) { // An error-probably user cancelled.
-			if (version >= 4)
-				putVariable(curResult,0);
+			if (this.version >= 4)
+				putVariable(this.curResult,0);
 			return;
 		}
 
 		// Remember the transcript bit
-		tsBit = memory.fetchWord(0x10) & 0x0001;
+		tsBit = this.memory.fetchWord(0x10) & 0x0001;
 
 		try {
 			fis = new FileInputStream(fn);
 			dis = new DataInputStream(fis);
 			readState(dis);
-			memory.readMemory(dis,0,dynamicMemorySize);
+            this.memory.readMemory(dis,0, this.dynamicMemorySize);
 			fis.close();
 		}
 		catch (IOException ex1) {
-			if (version >= 4)
-				putVariable(curResult,0);
+			if (this.version >= 4)
+				putVariable(this.curResult,0);
 			return;
 		}
 
 		// We did it!
-		memory.putWord(0x10,memory.fetchWord(0x10) | tsBit);
-		if (version >= 3) {
-			curResult = memory.fetchByte(curCallFrame.pc - 1);
-			putVariable(curResult,2); // Is this correct?
+        this.memory.putWord(0x10, this.memory.fetchWord(0x10) | tsBit);
+		if (this.version >= 3) {
+            this.curResult = this.memory.fetchByte(this.curCallFrame.pc - 1);
+			putVariable(this.curResult,2); // Is this correct?
 		}
     }
 
@@ -1677,15 +1682,15 @@ public class ZCPU extends Object implements Runnable {
     private void zop_restart()
     {
 		// This will cause the decoder to exit and the ZMachine to restart
-		zui.restart();
-        restartFlag = true;
+        this.zui.restart();
+        this.restartFlag = true;
         return;
     }
 
     // RET_PULLED
     private void zop_ret_pulled()
     {
-        op1 = getVariable(0);
+        this.op1 = getVariable(0);
         zop_ret();
     }
 
@@ -1698,20 +1703,20 @@ public class ZCPU extends Object implements Runnable {
     // CATCH <result>           V5+
     private void zop_catch()
     {
-		putVariable(curResult,curCallFrame.frameNumber);
+		putVariable(this.curResult, this.curCallFrame.frameNumber);
     }
 
     // QUIT
     private void zop_quit()
     {
-        zui.quit();
+        this.zui.quit();
     }
 
     // NEW_LINE
     private void zop_new_line()
     {
-        did_newline = true;
-		ioCard.printString("\n");
+        this.did_newline = true;
+        this.ioCard.printString("\n");
     }
 
     // SHOW_STATUS      V3
@@ -1724,18 +1729,15 @@ public class ZCPU extends Object implements Runnable {
         // This instruction is known to appear spuriously in some
         // V5 games (notably Wishbringer Solid Gold), so if this
         // storyfile is not V1-3, we'll ignore it.
-        if (version > 3)
+        if (this.version > 3)
             return;
 
         // Find out if this is a time game or not.  Can this change
         // during a game?  I'm assuming it can.
-        if ((memory.fetchByte(0x01) & 0x02) == 0x02)
-            timegame = true;
-        else
-            timegame = false;
+        timegame = (this.memory.fetchByte(0x01) & 0x02) == 0x02;
 
         // Get the current location name
-        name = objTable.getObjectName(getVariable(16));
+        name = this.objTable.getObjectName(getVariable(16));
         s = decodeZString(name);
 
         // Get the two integers
@@ -1743,7 +1745,7 @@ public class ZCPU extends Object implements Runnable {
         b = signedWord(getVariable(18));
 
         // Pass it on to the user interface.
-        zui.showStatusBar(s,a,b,timegame);
+        this.zui.showStatusBar(s,a,b,timegame);
     }
 
     // VERIFY <branch>
@@ -1769,7 +1771,7 @@ public class ZCPU extends Object implements Runnable {
     // JZ a <branch>
     private void zop_jz()
     {
-        if (op1 == 0)
+        if (this.op1 == 0)
             doBranch();
         else
             dontBranch();
@@ -1780,8 +1782,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int sib;
 
-        sib = objTable.getSibling(op1);
-        putVariable(curResult,sib);
+        sib = this.objTable.getSibling(this.op1);
+        putVariable(this.curResult,sib);
         if (sib != 0)
             doBranch();
         else
@@ -1793,8 +1795,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int child;
 
-        child = objTable.getChild(op1);
-        putVariable(curResult,child);
+        child = this.objTable.getChild(this.op1);
+        putVariable(this.curResult,child);
         if (child != 0)
             doBranch();
         else
@@ -1806,8 +1808,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int parent;
 
-        parent = objTable.getParent(op1);
-        putVariable(curResult,parent);
+        parent = this.objTable.getParent(this.op1);
+        putVariable(this.curResult,parent);
     }
 
     // GET_PROP_LEN baddr <result>
@@ -1815,8 +1817,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int len;
 
-        len = objTable.getPropertyLength(op1);
-        putVariable(curResult,len);
+        len = this.objTable.getPropertyLength(this.op1);
+        putVariable(this.curResult,len);
     }
 
     // INC var
@@ -1824,9 +1826,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int w;
 
-        w = signedWord(getVariable(op1));
-        w = ((w + 1) % 0x10000);
-        putVariable(op1,w);
+        w = signedWord(getVariable(this.op1));
+        w = (w + 1) % 0x10000;
+        putVariable(this.op1,w);
     }
 
     // DEC var
@@ -1834,9 +1836,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int w;
 
-        w = signedWord(getVariable(op1));
-        w = ((w - 1) % 0x10000);
-        putVariable(op1,w);
+        w = signedWord(getVariable(this.op1));
+        w = (w - 1) % 0x10000;
+        putVariable(this.op1,w);
     }
 
     // PRINT_ADDR addr
@@ -1844,15 +1846,15 @@ public class ZCPU extends Object implements Runnable {
     {
         String s;
 
-        s = decodeZString(op1);
-        ioCard.printString(s);
+        s = decodeZString(this.op1);
+        this.ioCard.printString(s);
     }
 
     // CALL_F0 raddr <result>       V4+
     private void zop_call_f0()
     {
-		numvops = 1;
-		vops[0] = op1;
+        this.numvops = 1;
+        this.vops[0] = this.op1;
 		zop_call_fv();
     }
 
@@ -1861,10 +1863,10 @@ public class ZCPU extends Object implements Runnable {
     {
         int parent;
 
-        parent = objTable.getParent(op1);
-        if (op1 == 0)
+        parent = this.objTable.getParent(this.op1);
+        if (this.op1 == 0)
             return; // No parent, no service.
-        objTable.removeObject(parent,op1);
+        this.objTable.removeObject(parent, this.op1);
     }
 
     // PRINT_OBJ obj
@@ -1873,39 +1875,39 @@ public class ZCPU extends Object implements Runnable {
         int addr;
         String s;
 
-        addr = objTable.getObjectName(op1);
+        addr = this.objTable.getObjectName(this.op1);
         s = decodeZString(addr);
-        ioCard.printString(s);
+        this.ioCard.printString(s);
     }
 
     // RET a
     private void zop_ret()
     {
         // First, make sure we *can* return.
-        if (callStack.empty())
-            zui.fatal("Call stack underflow");
+        if (this.callStack.empty())
+            this.zui.fatal("Call stack underflow");
 
         // Now do the appropriate thing for each call type.
-        if (curCallFrame.callType == ZCallFrame.PROCEDURE) {
-            curCallFrame = (ZCallFrame)callStack.pop();
+        if (this.curCallFrame.callType == ZCallFrame.PROCEDURE) {
+            this.curCallFrame = (ZCallFrame) this.callStack.pop();
             return;
         }
-        else if (curCallFrame.callType == ZCallFrame.FUNCTION) {
-            curCallFrame = (ZCallFrame)callStack.pop();
-            curResult = memory.fetchByte(curCallFrame.pc);
-            curCallFrame.pc++;
-            putVariable(curResult,op1);
+        else if (this.curCallFrame.callType == ZCallFrame.FUNCTION) {
+            this.curCallFrame = (ZCallFrame) this.callStack.pop();
+            this.curResult = this.memory.fetchByte(this.curCallFrame.pc);
+            this.curCallFrame.pc++;
+            putVariable(this.curResult, this.op1);
             return;
         }
-        else if (curCallFrame.callType == ZCallFrame.INTERRUPT) {
-            curCallFrame = (ZCallFrame)callStack.pop();
-            decode_ret_flag = true;
-            ret_value = op1;
+        else if (this.curCallFrame.callType == ZCallFrame.INTERRUPT) {
+            this.curCallFrame = (ZCallFrame) this.callStack.pop();
+            this.decode_ret_flag = true;
+            this.ret_value = this.op1;
             return;
         }
 
         // If we make it here, something is wrong.
-        zui.fatal("Corrupted call frame");
+        this.zui.fatal("Corrupted call frame");
         return;
     }
 
@@ -1914,9 +1916,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        curCallFrame.pc = curCallFrame.pc + sop1 - 2;
+        this.curCallFrame.pc = this.curCallFrame.pc + sop1 - 2;
     }
 
     // PRINT_PADDR saddr
@@ -1925,9 +1927,9 @@ public class ZCPU extends Object implements Runnable {
         int addr;
         String s;
 
-        addr = unpackAddr(op1,false);
+        addr = unpackAddr(this.op1,false);
         s = decodeZString(addr);
-        ioCard.printString(s);
+        this.ioCard.printString(s);
     }
 
     // LOAD var <result>
@@ -1935,8 +1937,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int w;
 
-        w = getVariable(op1);
-        putVariable(curResult,w);
+        w = getVariable(this.op1);
+        putVariable(this.curResult,w);
     }
 
     // NOT a <result>
@@ -1944,18 +1946,18 @@ public class ZCPU extends Object implements Runnable {
     {
         int val;
 
-        if (op1type == ARGTYPE_WORD)
-            val = ((~op1) & 0xffff);
+        if (this.op1type == this.ARGTYPE_WORD)
+            val = ~this.op1 & 0xffff;
         else
-            val = ((~op1) & 0xff);
-        putVariable(curResult,val);
+            val = ~this.op1 & 0xff;
+        putVariable(this.curResult,val);
     }
 
     // CALL_P0 raddr  V5+
     private void zop_call_p0()
     {
-		numvops = 1;
-		vops[0] = op1;
+        this.numvops = 1;
+        this.vops[0] = this.op1;
 		zop_call_pv();
     }
 
@@ -1967,9 +1969,9 @@ public class ZCPU extends Object implements Runnable {
     // JE a [b1 b2 b3] <branch>
     private void zop_je()
     {
-        if (curInstruction == 0xc1) { // The variable version
-            for (int i = 1; i<numvops; i++) {
-                if (vops[0] == vops[i]) {
+        if (this.curInstruction == 0xc1) { // The variable version
+            for (int i = 1; i< this.numvops; i++) {
+                if (this.vops[0] == this.vops[i]) {
                     doBranch();
                     return;
                 }
@@ -1979,7 +1981,7 @@ public class ZCPU extends Object implements Runnable {
             return;
         }
         else { // The two-operand version
-            if (op1 == op2)
+            if (this.op1 == this.op2)
                 doBranch();
             else
                 dontBranch();
@@ -1992,9 +1994,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
         if (sop1 < sop2)
             doBranch();
@@ -2007,9 +2009,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
         if (sop1 > sop2)
             doBranch();
@@ -2024,8 +2026,8 @@ public class ZCPU extends Object implements Runnable {
         zop_dec();
 
         // JL var s
-        op1 = getVariable(op1);
-        op1type = ARGTYPE_WORD;
+        this.op1 = getVariable(this.op1);
+        this.op1type = this.ARGTYPE_WORD;
         zop_jl();
     }
 
@@ -2036,8 +2038,8 @@ public class ZCPU extends Object implements Runnable {
          zop_inc();
 
          // JG var t
-         op1 = getVariable(op1);
-         op1type = ARGTYPE_WORD;
+        this.op1 = getVariable(this.op1);
+        this.op1type = this.ARGTYPE_WORD;
          zop_jg();
     }
 
@@ -2046,9 +2048,9 @@ public class ZCPU extends Object implements Runnable {
     {
         int parent;
 
-        parent = objTable.getParent(op1);
+        parent = this.objTable.getParent(this.op1);
 
-        if (parent == op2)
+        if (parent == this.op2)
             doBranch();
         else
             dontBranch();
@@ -2057,7 +2059,7 @@ public class ZCPU extends Object implements Runnable {
     // TEST a b <branch>
     private void zop_test()
     {
-        if ((op1 & op2) == op2)
+        if ((this.op1 & this.op2) == this.op2)
             doBranch();
         else
             dontBranch();
@@ -2066,19 +2068,19 @@ public class ZCPU extends Object implements Runnable {
     // OR a b <result>
     private void zop_or()
     {
-        putVariable(curResult,(op1 | op2));
+        putVariable(this.curResult, this.op1 | this.op2);
     }
 
     // AND a b <result>
     private void zop_and()
     {
-        putVariable(curResult,(op1 & op2));
+        putVariable(this.curResult, this.op1 & this.op2);
     }
 
     // TEST_ATTR obj attr <branch>
     private void zop_test_attr()
     {
-        if (objTable.hasAttribute(op1,op2))
+        if (this.objTable.hasAttribute(this.op1, this.op2))
             doBranch();
         else
             dontBranch();
@@ -2087,37 +2089,37 @@ public class ZCPU extends Object implements Runnable {
     // SET_ATTR obj attr
     private void zop_set_attr()
     {
-        objTable.setAttribute(op1,op2);
+        this.objTable.setAttribute(this.op1, this.op2);
     }
 
     // CLEAR_ATTR obj attr
     private void zop_clear_attr()
     {
-        objTable.clearAttribute(op1,op2);
+        this.objTable.clearAttribute(this.op1, this.op2);
     }
 
     // STORE var a
     private void zop_store()
     {
-        putVariable(op1,op2);
+        putVariable(this.op1, this.op2);
     }
 
     // INSERT_OBJ obj1 obj2
     private void zop_insert_obj()
     {
-        objTable.insertObject(op1,op2);
+        this.objTable.insertObject(this.op1, this.op2);
     }
 
     // LOADW baddr n <result>
     private void zop_loadw()
     {
-        putVariable(curResult,memory.fetchWord(op1 + (2 * op2)));
+        putVariable(this.curResult, this.memory.fetchWord(this.op1 + 2 * this.op2));
     }
 
     // LOADB baddr n <result>
     private void zop_loadb()
     {
-        putVariable(curResult,memory.fetchByte(op1+op2));
+        putVariable(this.curResult, this.memory.fetchByte(this.op1 + this.op2));
     }
 
     // GET_PROP obj prop <result>
@@ -2125,8 +2127,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int prop;
 
-        prop = objTable.getProperty(op1,op2);
-        putVariable(curResult,prop);
+        prop = this.objTable.getProperty(this.op1, this.op2);
+        putVariable(this.curResult,prop);
     }
 
     // GET_PROP_ADDR obj prop <result>
@@ -2134,8 +2136,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int addr;
 
-        addr = objTable.getPropertyAddress(op1,op2);
-        putVariable(curResult,addr);
+        addr = this.objTable.getPropertyAddress(this.op1, this.op2);
+        putVariable(this.curResult,addr);
     }
 
     // GET_NEXT_PROP obj prop <result>
@@ -2143,8 +2145,8 @@ public class ZCPU extends Object implements Runnable {
     {
         int num;
 
-        num = objTable.getNextProperty(op1,op2);
-        putVariable(curResult,num);
+        num = this.objTable.getNextProperty(this.op1, this.op2);
+        putVariable(this.curResult,num);
     }
 
     // ADD a b <result>
@@ -2152,11 +2154,11 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
-        putVariable(curResult,unsignedWord(sop1 + sop2));
+        putVariable(this.curResult,unsignedWord(sop1 + sop2));
     }
 
     // SUB a b <result>
@@ -2164,11 +2166,11 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
-        putVariable(curResult,unsignedWord(sop1 - sop2));
+        putVariable(this.curResult,unsignedWord(sop1 - sop2));
     }
 
     // MUL a b <result>
@@ -2176,11 +2178,11 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
-        putVariable(curResult,unsignedWord(sop1 * sop2));
+        putVariable(this.curResult,unsignedWord(sop1 * sop2));
     }
 
     // DIV a b <result>
@@ -2188,14 +2190,14 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        if (op2 == 0)
-            zui.fatal("Divide by zero");
+        if (this.op2 == 0)
+            this.zui.fatal("Divide by zero");
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
-        putVariable(curResult,unsignedWord(sop1 / sop2));
+        putVariable(this.curResult,unsignedWord(sop1 / sop2));
     }
 
     // MOD a b <result>
@@ -2203,44 +2205,44 @@ public class ZCPU extends Object implements Runnable {
     {
         int sop1, sop2;
 
-        if (op2 == 0) {
-            putVariable(curResult,op1);
+        if (this.op2 == 0) {
+            putVariable(this.curResult, this.op1);
             return;
         }
 
-        sop1 = signedWord(op1);
+        sop1 = signedWord(this.op1);
 
-        sop2 = signedWord(op2);
+        sop2 = signedWord(this.op2);
 
-        putVariable(curResult,unsignedWord(sop1 % sop2));
+        putVariable(this.curResult,unsignedWord(sop1 % sop2));
     }
 
     // CALL_F1 raddr a1 <result>    V4+
     private void zop_call_f1()
     {
-		numvops = 2;
-		vops[0] = op1;
-		vops[1] = op2;
+        this.numvops = 2;
+        this.vops[0] = this.op1;
+        this.vops[1] = this.op2;
 		zop_call_fv();
     }
 
     // CALL_P1 raddr a1     V5+
     private void zop_call_p1()
     {
-		numvops = 2;
-		vops[0] = op1;
-		vops[1] = op2;
+        this.numvops = 2;
+        this.vops[0] = this.op1;
+        this.vops[1] = this.op2;
 		zop_call_pv();
     }
 
     // SET_COLOUR f b       V5+
     private void zop_set_colour()
     {
-		if (op1 == 1)
-			op1 = memory.fetchByte(0x2d);
-		if (op2 == 1)
-			op2 = memory.fetchByte(0x2c);
-		zui.setColor(op1,op2);
+		if (this.op1 == 1)
+            this.op1 = this.memory.fetchByte(0x2d);
+		if (this.op2 == 1)
+            this.op2 = this.memory.fetchByte(0x2c);
+        this.zui.setColor(this.op1, this.op2);
     }
 
     // THROW a fp       V5+
@@ -2248,10 +2250,10 @@ public class ZCPU extends Object implements Runnable {
     {
 		// Pop the stack until we either find the frame being referenced, or the
 		// stack underflows (a fatal error).
-		while ((curCallFrame.frameNumber != op2) && (!callStack.empty()))
-			curCallFrame = (ZCallFrame)callStack.pop();
-		if (curCallFrame.frameNumber != op2) // Stack underflow
-			zui.fatal("THROW: Call stack underflow");
+		while (this.curCallFrame.frameNumber != this.op2 && !this.callStack.empty())
+            this.curCallFrame = (ZCallFrame) this.callStack.pop();
+		if (this.curCallFrame.frameNumber != this.op2) // Stack underflow
+            this.zui.fatal("THROW: Call stack underflow");
 
 		// We have the frame; now do a RET a
 		zop_ret();
@@ -2272,96 +2274,96 @@ public class ZCPU extends Object implements Runnable {
 		int newFrameNumber;
 
         // First, make sure raddr is not 0
-        if (vops[0] == 0) {
-            putVariable(curResult,0);
+        if (this.vops[0] == 0) {
+            putVariable(this.curResult,0);
             return;
         }
 
 		// Get the number of arguments
-        numargs = numvops - 1;
+        numargs = this.numvops - 1;
 
         // Unpack the routine address
-        addr = unpackAddr(vops[0],true);
+        addr = unpackAddr(this.vops[0],true);
 
 //		System.out.println(Integer.toHexString(curCallFrame.pc) + " CALL " + Integer.toHexString(addr) + " " + vops[1] + " " + vops[2] + " " + vops[3] + " " + vops[4] + " " + vops[5] + " " + vops[6] + " " + vops[7] + "(" + numvops + ")" + " " + Integer.toHexString(getVariable(3)) + " " + Integer.toHexString(getVariable(5)));
         // Get the number of local variables
-        numvars = memory.fetchByte(addr);
+        numvars = this.memory.fetchByte(addr);
 
         // Bump the address past the variables byte, in any version
         addr++;
 
         // Back up the PC to point to the result byte
-        curCallFrame.pc--;
+        this.curCallFrame.pc--;
 
 		// Get the number of the next call frame.
-		newFrameNumber = curCallFrame.frameNumber + 1;
+		newFrameNumber = this.curCallFrame.frameNumber + 1;
 
         // Push the current call frame onto the stack.
-        callStack.push(curCallFrame);
+        this.callStack.push(this.curCallFrame);
 
         // Initialize a new call frame
-        curCallFrame = new ZCallFrame();
+        this.curCallFrame = new ZCallFrame();
 
         // Put the PC at the appropriate place, depending on
         // whether local variables are present.
-        if (version < 5)
-            curCallFrame.pc = addr + (numvars * 2);
+        if (this.version < 5)
+            this.curCallFrame.pc = addr + numvars * 2;
         else
-            curCallFrame.pc = addr;
+            this.curCallFrame.pc = addr;
 
         // Create an empty routine stack
-        curCallFrame.routineStack = new Stack();
+        this.curCallFrame.routineStack = new Stack();
 
         // Initialize local variables
-        curCallFrame.numLocalVars = numvars;
+        this.curCallFrame.numLocalVars = numvars;
         for (int i = 0;i < numvars;i++) {
             // Fill in an argument in this variable, if one exists.
             if (i < numargs) {
-                curCallFrame.localVars[i] = vops[i + 1];
+                this.curCallFrame.localVars[i] = this.vops[i + 1];
                 continue;
             }
 
             // Otherwise, if this is a pre-V5 game, fill in
             // a local variable.
-            if (version < 5) {
-                curCallFrame.localVars[i] = memory.fetchWord(addr + (i * 2));
+            if (this.version < 5) {
+                this.curCallFrame.localVars[i] = this.memory.fetchWord(addr + i * 2);
                 continue;
             }
 
             // Otherwise, just make this variable 0.
-            curCallFrame.localVars[i] = 0;
+            this.curCallFrame.localVars[i] = 0;
         }
 
         // Store the call type (only strictly necessary in V3+)
-        curCallFrame.callType = ZCallFrame.FUNCTION;
+        this.curCallFrame.callType = ZCallFrame.FUNCTION;
 
         // Store the number of arguments (only strictly necessary
         // in V5+)
         if (numargs > numvars)
-            curCallFrame.argCount = numvars;
+            this.curCallFrame.argCount = numvars;
         else
-            curCallFrame.argCount = numargs;
+            this.curCallFrame.argCount = numargs;
 
 		// Stor the call frame number
-		curCallFrame.frameNumber = newFrameNumber;
+        this.curCallFrame.frameNumber = newFrameNumber;
     }
 
     // STOREW baddr n a
     private void zop_storew()
     {
-        memory.putWord((vops[0] + (2 * vops[1])),vops[2]);
+        this.memory.putWord(this.vops[0] + 2 * this.vops[1], this.vops[2]);
     }
 
     // STOREB baddr n byte
     private void zop_storeb()
     {
-        memory.putByte((vops[0] + vops[1]),vops[2]);
+        this.memory.putByte(this.vops[0] + this.vops[1], this.vops[2]);
     }
 
     // PUT_PROP obj prop a
     private void zop_put_prop()
     {
-        objTable.putProperty(vops[0],vops[1],vops[2]);
+        this.objTable.putProperty(this.vops[0], this.vops[1], this.vops[2]);
     }
 
     // READ baddr1 baddr2                       V1-3
@@ -2377,42 +2379,42 @@ public class ZCPU extends Object implements Runnable {
 		int baddr1, baddr2;
         int time = 0, raddr = 0;
         
-		baddr1 = vops[0];
-		baddr2 = vops[1];
-        if (numvops > 2) {
-            time = vops[2];
-            raddr = vops[3];
+		baddr1 = this.vops[0];
+		baddr2 = this.vops[1];
+        if (this.numvops > 2) {
+            time = this.vops[2];
+            raddr = this.vops[3];
         }
         
 		// Flush the I/O card's output buffer
-		ioCard.outputFlush();
+        this.ioCard.outputFlush();
 
         // This implies a SHOW_STATUS in V1-3.
-        if (version < 4)
+        if (this.version < 4)
             zop_show_status();
 
         // Read a line of text
         sb = new StringBuffer();
-        if ((time > 0) && (raddr > 0)) { // A timed READ
+        if (time > 0 && raddr > 0) { // A timed READ
             while (true) { // Ick.
-                termChar = ioCard.readLine(sb,time);
+                termChar = this.ioCard.readLine(sb,time);
                 if (termChar == -1) { // A timeout
 //                    ioCard.outputFlush();
 //                    did_newline = false;
                     for (int i = 0; i < sb.length(); i++)
-                        ioCard.printString("\b");
+                        this.ioCard.printString("\b");
                     int rc = interrupt(raddr);
                     if (rc == 0) {
 //                        if (did_newline) {
 //                            ioCard.printString("\n" + sb.toString());
 //                            ioCard.outputFlush();
 //                        }
-                        ioCard.printString(sb.toString());
-                        ioCard.outputFlush();
+                        this.ioCard.printString(sb.toString());
+                        this.ioCard.outputFlush();
                         continue;
                     }
                     else {
-                        ioCard.outputFlush();
+                        this.ioCard.outputFlush();
                         sb = new StringBuffer();
                         termChar = 0;
                         break;
@@ -2423,42 +2425,42 @@ public class ZCPU extends Object implements Runnable {
             }
         }
         else
-            termChar = ioCard.readLine(sb,0);
+            termChar = this.ioCard.readLine(sb,0);
         s = sb.toString();
         
         // If V1-4, just store the line.  If V5+, possibly
         // store it after other characters in the buffer.
-        if (version <= 4) {
+        if (this.version <= 4) {
             curaddr = baddr1 + 1;
             len = s.length();
             for (int i = 0;i < len;i++) {
-                memory.putByte(curaddr,Character.toLowerCase(s.charAt(i)));
+                this.memory.putByte(curaddr,Character.toLowerCase(s.charAt(i)));
                 curaddr++;
             }
-            memory.putByte(curaddr,0);
+            this.memory.putByte(curaddr,0);
         }
         else {
-            int nchars = memory.fetchByte(baddr1 + 1);
+            int nchars = this.memory.fetchByte(baddr1 + 1);
 			curaddr = baddr1 + 2 + nchars;
 			len = s.length();
 			for (int i = 0;i < len;i++) {
-				memory.putByte(curaddr,Character.toLowerCase(s.charAt(i)));
+                this.memory.putByte(curaddr,Character.toLowerCase(s.charAt(i)));
 				curaddr++;
 			}
-			memory.putByte(baddr1+1,(nchars + len));
+            this.memory.putByte(baddr1+1, nchars + len);
         }
 
 		// Tokenize input
 		if (baddr2 != 0) {
-			vops[0] = baddr1;
-			vops[1] = baddr2;
-			numvops = 2;
+            this.vops[0] = baddr1;
+            this.vops[1] = baddr2;
+            this.numvops = 2;
 			zop_tokenise();
 		}
 
         // If V5+, store result
-		if (version >= 5)
-			putVariable(curResult,termChar);
+		if (this.version >= 5)
+			putVariable(this.curResult,termChar);
     }
 
     // PRINT_CHAR n
@@ -2466,8 +2468,8 @@ public class ZCPU extends Object implements Runnable {
     {
         String s;
 
-        s = new String(String.valueOf((char)vops[0]));
-        ioCard.printString(s);
+        s = new String(String.valueOf((char) this.vops[0]));
+        this.ioCard.printString(s);
     }
 
     // PRINT_NUM s
@@ -2476,27 +2478,27 @@ public class ZCPU extends Object implements Runnable {
         int sop1;
         String s;
 
-        sop1 = signedWord(vops[0]);
+        sop1 = signedWord(this.vops[0]);
 
         s = new String(String.valueOf(sop1));
-        ioCard.printString(s);
+        this.ioCard.printString(s);
     }
 
     // RANDOM s <result>
     private void zop_random()
     {
-        if (signedWord(vops[0]) > 0)
-            putVariable(curResult,rndgen.getRandom(signedWord(vops[0])));
+        if (signedWord(this.vops[0]) > 0)
+            putVariable(this.curResult, this.rndgen.getRandom(signedWord(this.vops[0])));
         else {
-            rndgen.seed(signedWord(vops[0]));
-            putVariable(curResult,0);
+            this.rndgen.seed(signedWord(this.vops[0]));
+            putVariable(this.curResult,0);
         }
     }
 
     // PUSH a
     private void zop_push()
     {
-        putVariable(0,vops[0]);
+        putVariable(0, this.vops[0]);
     }
 
     // PULL var                 V1-5,7-8
@@ -2504,23 +2506,23 @@ public class ZCPU extends Object implements Runnable {
     private void zop_pull()
     {
         // This will need to be extended for V6 support
-        putVariable(vops[0],getVariable(0));
+        putVariable(this.vops[0],getVariable(0));
     }
 
     // SPLIT_SCREEN n           V3+
     private void zop_split_screen()
     {
-        ioCard.outputFlush();
-        zui.splitScreen(vops[0]);
+        this.ioCard.outputFlush();
+        this.zui.splitScreen(this.vops[0]);
     }
 
     // SET_WINDOW window        V3+
     private void zop_set_window()
     {
-        ioCard.outputFlush();
+        this.ioCard.outputFlush();
 
         // In V6, -3 represents the current window
-        zui.setCurrentWindow(vops[0]);
+        this.zui.setCurrentWindow(this.vops[0]);
     }
 
     // CALL_FD raddr [a1 a2 a3 a4 a5 a6 a7] <result>    V4+
@@ -2535,32 +2537,32 @@ public class ZCPU extends Object implements Runnable {
     {
 		int sop1;
 
-		sop1 = signedWord(vops[0]);
+		sop1 = signedWord(this.vops[0]);
 		if (sop1 == -1) { // Erase everything, do a SPLIT_SCREEN 0
-			zui.eraseWindow(0);
-			zui.eraseWindow(1);
-			vops[0] = 0;
-			numvops = 1;
+            this.zui.eraseWindow(0);
+            this.zui.eraseWindow(1);
+            this.vops[0] = 0;
+            this.numvops = 1;
 			zop_split_screen();
 			return;
 		}
 		else // In V6, we'll have to handle -2 explicitly
-			zui.eraseWindow(vops[0]);
+            this.zui.eraseWindow(this.vops[0]);
     }
 
     // ERASE_LINE               V4-5,7-8
     // ERASE_LINE n             V6
     private void zop_erase_line()
     {
-		zui.eraseLine(1);
+        this.zui.eraseLine(1);
     }
 
     // SET_CURSOR s x           V4-5,7-8
     // SET_CURSOR s x [window]  V6
     private void zop_set_cursor()
     {
-		ioCard.outputFlush();
-		zui.setCursorPosition(vops[1],vops[0]);
+        this.ioCard.outputFlush();
+        this.zui.setCursorPosition(this.vops[1], this.vops[0]);
     }
 
     // GET_CURSOR baddr         V4+
@@ -2568,20 +2570,20 @@ public class ZCPU extends Object implements Runnable {
     {
 		Point p;
 
-		ioCard.outputFlush();
-		p = zui.getCursorPosition();
-		memory.putWord(vops[0],p.y);
-		memory.putWord(vops[0]+2,p.x);
+        this.ioCard.outputFlush();
+		p = this.zui.getCursorPosition();
+        this.memory.putWord(this.vops[0],p.y);
+        this.memory.putWord(this.vops[0]+2,p.x);
     }
 
     // SET_TEXT_STYLE n         V4+
     private void zop_set_text_style()
     {
-        ioCard.outputFlush();
-        zui.setTextStyle(vops[0]);
-		Dimension s = zui.getFontSize();
-		memory.putByte(0x26,s.height);
-		memory.putByte(0x27,s.width);
+        this.ioCard.outputFlush();
+        this.zui.setTextStyle(this.vops[0]);
+		Dimension s = this.zui.getFontSize();
+        this.memory.putByte(0x26,s.height);
+        this.memory.putByte(0x27,s.width);
     }
 
     // BUFFER_MODE bit          V4+
@@ -2589,7 +2591,7 @@ public class ZCPU extends Object implements Runnable {
     {
 		// This doesn't really fit in with our buffering method, so we ignore it.
 		// Flush the buffer, though.
-		ioCard.outputFlush();
+        this.ioCard.outputFlush();
     }
 
     // OUTPUT_STREAM s              V3-4
@@ -2599,16 +2601,16 @@ public class ZCPU extends Object implements Runnable {
     {
         int w;
 
-        if (numvops == 3)
-            ioCard.setOutputStream(signedWord(vops[0]),vops[1],vops[2],true);
+        if (this.numvops == 3)
+            this.ioCard.setOutputStream(signedWord(this.vops[0]), this.vops[1], this.vops[2],true);
         else
-            ioCard.setOutputStream(signedWord(vops[0]),vops[1],0,false);
+            this.ioCard.setOutputStream(signedWord(this.vops[0]), this.vops[1],0,false);
     }
 
     // INPUT_STREAM n               V3+
     private void zop_input_stream()
     {
-        ioCard.setInputStream(vops[0]);
+        this.ioCard.setInputStream(this.vops[0]);
     }
 
     // SOUND n [op time raddr]      V3+
@@ -2616,15 +2618,15 @@ public class ZCPU extends Object implements Runnable {
     {
         // Silently fail on this instruction if no raddr argument;
         // otherwise, go straight to raddr for now.
-        if (numvops == 1)
+        if (this.numvops == 1)
             return;
 
-        if (vops[1] != 2)
+        if (this.vops[1] != 2)
             return;
 
         // Pretend a CALL_P0 has just been executed.
-        op1 = vops[3];
-        op1type = voptypes[3];
+        this.op1 = this.vops[3];
+        this.op1type = this.voptypes[3];
         zop_call_p0();
     }
 
@@ -2633,28 +2635,28 @@ public class ZCPU extends Object implements Runnable {
     {
 		int c;
 
-		ioCard.outputFlush();
-		if ((numvops > 1) && (vops[1] != 0) && (vops[2] != 0)) { // A timed READ_CHAR
+        this.ioCard.outputFlush();
+		if (this.numvops > 1 && this.vops[1] != 0 && this.vops[2] != 0) { // A timed READ_CHAR
 		    while (true) { // Yuck.
-		        c = ioCard.readChar(vops[1]);
+		        c = this.ioCard.readChar(this.vops[1]);
 		        if (c == -1) { // A timeout
-		            int rc = interrupt(vops[2]);
+		            int rc = interrupt(this.vops[2]);
 		            if (rc == 0)
 		                continue;
 		            else {
-		                putVariable(curResult,0);
+		                putVariable(this.curResult,0);
 		                return;
 		            }
 		        }
 		        else { // A character
-		            putVariable(curResult,c);
+		            putVariable(this.curResult,c);
 		            return;
 		        }
 		    }
 		}
 		else {
-    		c = ioCard.readChar(0);
-	    	putVariable(curResult,c);
+    		c = this.ioCard.readChar(0);
+	    	putVariable(this.curResult,c);
 	    }
     }
 
@@ -2668,42 +2670,39 @@ public class ZCPU extends Object implements Runnable {
         int testData; // Data to test
 
         // Get operands
-        a = vops[0];
-        baddr = vops[1];
-        n = vops[2];
-        if (numvops == 4)
-            format = vops[3];
+        a = this.vops[0];
+        baddr = this.vops[1];
+        n = this.vops[2];
+        if (this.numvops == 4)
+            format = this.vops[3];
         else
             format = 0x82;
-        if ((format & 0x80) == 0x80)
-            searchWord = true;
-        else
-            searchWord = false;
-        tableWidth = (format & 0x7f);
+        searchWord = (format & 0x80) == 0x80;
+        tableWidth = format & 0x7f;
 
         // Fail if it's a table of bytes and a is word-valued
-        if ((tableWidth == 2) && (voptypes[0] == ARGTYPE_BYTE)) {
-            putVariable(curResult,0);
+        if (tableWidth == 2 && this.voptypes[0] == this.ARGTYPE_BYTE) {
+            putVariable(this.curResult,0);
             dontBranch();
             return;
         }
 
         // Search the table
         for (int i=0;i<n;i++) {
-            testAddr = (baddr + (i * tableWidth));
+            testAddr = baddr + i * tableWidth;
             if (searchWord)
-                testData = memory.fetchWord(testAddr);
+                testData = this.memory.fetchWord(testAddr);
             else
-                testData = memory.fetchByte(testAddr);
+                testData = this.memory.fetchByte(testAddr);
             if (testData == a) { // A match!
-                putVariable(curResult,(baddr + (i * tableWidth)));
+                putVariable(this.curResult, baddr + i * tableWidth);
                 doBranch();
                 return;
             }
         }
 
         // If we get here, there was no match, or n < 1
-        putVariable(curResult,0);
+        putVariable(this.curResult,0);
         dontBranch();
         return;
     }
@@ -2718,76 +2717,76 @@ public class ZCPU extends Object implements Runnable {
 		int newFrameNumber;
 
         // First, make sure raddr is not 0
-        if (vops[0] == 0) {
-            putVariable(curResult,0);
+        if (this.vops[0] == 0) {
+            putVariable(this.curResult,0);
             return;
         }
 
 		// Get the number of arguments
-        numargs = numvops - 1;
+        numargs = this.numvops - 1;
 
         // Unpack the routine address
-        addr = unpackAddr(vops[0],true);
+        addr = unpackAddr(this.vops[0],true);
 
 		// System.out.println(Integer.toHexString(curCallFrame.pc) + " CALL " + Integer.toHexString(addr) + " " + vops[1] + " " + vops[2] + " " + vops[3]);
 
         // Get the number of local variables
-        numvars = memory.fetchByte(addr);
+        numvars = this.memory.fetchByte(addr);
 
         // Bump the address past the variables byte, in any version
         addr++;
 
 		// Get the number of the next call frame.
-		newFrameNumber = curCallFrame.frameNumber + 1;
+		newFrameNumber = this.curCallFrame.frameNumber + 1;
 
         // Push the current call frame onto the stack.
-        callStack.push(curCallFrame);
+        this.callStack.push(this.curCallFrame);
 
         // Initialize a new call frame
-        curCallFrame = new ZCallFrame();
+        this.curCallFrame = new ZCallFrame();
 
         // Put the PC at the appropriate place, depending on
         // whether local variables are present.
-        if (version < 5)
-            curCallFrame.pc = addr + (numvars * 2);
+        if (this.version < 5)
+            this.curCallFrame.pc = addr + numvars * 2;
         else
-            curCallFrame.pc = addr;
+            this.curCallFrame.pc = addr;
 
         // Create an empty routine stack
-        curCallFrame.routineStack = new Stack();
+        this.curCallFrame.routineStack = new Stack();
 
         // Initialize local variables
-        curCallFrame.numLocalVars = numvars;
+        this.curCallFrame.numLocalVars = numvars;
         for (int i = 0;i < numvars;i++) {
             // Fill in an argument in this variable, if one exists.
             if (i < numargs) {
-                curCallFrame.localVars[i] = vops[i + 1];
+                this.curCallFrame.localVars[i] = this.vops[i + 1];
                 continue;
             }
 
             // Otherwise, if this is a pre-V5 game, fill in
             // a local variable.
-            if (version < 5) {
-                curCallFrame.localVars[i] = memory.fetchWord(addr + (i * 2));
+            if (this.version < 5) {
+                this.curCallFrame.localVars[i] = this.memory.fetchWord(addr + i * 2);
                 continue;
             }
 
             // Otherwise, just make this variable 0.
-            curCallFrame.localVars[i] = 0;
+            this.curCallFrame.localVars[i] = 0;
         }
 
         // Store the call type (only strictly necessary in V3+)
-        curCallFrame.callType = ZCallFrame.PROCEDURE;
+        this.curCallFrame.callType = ZCallFrame.PROCEDURE;
 
         // Store the number of arguments (only strictly necessary
         // in V5+)
         if (numargs > numvars)
-            curCallFrame.argCount = numvars;
+            this.curCallFrame.argCount = numvars;
         else
-            curCallFrame.argCount = numargs;
+            this.curCallFrame.argCount = numargs;
 
 		// Store the call frame number
-		curCallFrame.frameNumber = newFrameNumber;
+        this.curCallFrame.frameNumber = newFrameNumber;
     }
 
     // TOKENISE baddr1 baddr2 [baddr3 bit]      V5+
@@ -2804,55 +2803,55 @@ public class ZCPU extends Object implements Runnable {
 		boolean match = true;
 		Integer n;
 
-		if (numvops > 2) {
-			dictaddr = vops[2];
-			bit = vops[3];
+		if (this.numvops > 2) {
+			dictaddr = this.vops[2];
+			bit = this.vops[3];
 		}
 		else {
-			dictaddr = mainDictionary;
+			dictaddr = this.mainDictionary;
 			bit = 0;
 		}
 
 		// Get the maximum number of tokens
-		maxtokens = memory.fetchByte(vops[1]);
+		maxtokens = this.memory.fetchByte(this.vops[1]);
 
 		// Set maximum token length, in words
-		if (version < 4)
+		if (this.version < 4)
 			maxtokenlen = 2;
 		else
 			maxtokenlen = 3;
 
 		// Construct a Java string from the input string.
 		s = new String();
-		if (version <= 4) { // Null-terminated input string
-			curaddr = vops[0] + 1;
-			c = memory.fetchByte(curaddr);
+		if (this.version <= 4) { // Null-terminated input string
+			curaddr = this.vops[0] + 1;
+			c = this.memory.fetchByte(curaddr);
 			while (c != 0) {
 				s = s + String.valueOf((char)c);
 				curaddr++;
-				c = memory.fetchByte(curaddr);
+				c = this.memory.fetchByte(curaddr);
 			}
 		}
 		else { // String with length value
-			len = memory.fetchByte(vops[0] + 1);
-			curaddr = vops[0] + 2;
+			len = this.memory.fetchByte(this.vops[0] + 1);
+			curaddr = this.vops[0] + 2;
 			for (i=0;i<len;i++) {
-				s = s + String.valueOf((char)memory.fetchByte(curaddr));
+				s = s + String.valueOf((char) this.memory.fetchByte(curaddr));
 				curaddr++;
 			}
 		}
 
 		// Create a string containing separators.
 		delimiters = new String(" "); // Space is always a delimiter.
-		numseparators = memory.fetchByte(dictaddr);
+		numseparators = this.memory.fetchByte(dictaddr);
 		for (i=1;i<=numseparators;i++)
-			delimiters = delimiters + String.valueOf((char)memory.fetchByte(dictaddr+i));
+			delimiters = delimiters + String.valueOf((char) this.memory.fetchByte(dictaddr+i));
 
 		// Get the number and length of dictionary entries.
 		curaddr = dictaddr + 1 + numseparators;
-		dictentrysize = memory.fetchByte(curaddr);
+		dictentrysize = this.memory.fetchByte(curaddr);
 		curaddr++;
-		numdictentries = signedWord(memory.fetchWord(curaddr));
+		numdictentries = signedWord(this.memory.fetchWord(curaddr));
 		curaddr += 2;
 		if (numdictentries < 0)
 			numdictentries = Math.abs(numdictentries); // We don't care whether the entries are sorted.
@@ -2863,7 +2862,7 @@ public class ZCPU extends Object implements Runnable {
 		strpos = 0; // Since the StringTokenizer isn't discarding any characters, we use
 					// strpos to keep track of our position within the string, so we can
 					// store the location of each token within the input string.
-		while (tokens.hasMoreTokens() && (numtokens < maxtokens)) {
+		while (tokens.hasMoreTokens() && numtokens < maxtokens) {
 			thistoken = tokens.nextToken();
 			if (thistoken.equals(" ")) { // Ignore spaces
 				strpos++;
@@ -2879,9 +2878,9 @@ public class ZCPU extends Object implements Runnable {
 				match = true;
 				curindex = 0;
 				for (j=0;j<maxtokenlen;j++) {
-					curword = memory.fetchWord(curaddr + (i * dictentrysize) + (j*2));
+					curword = this.memory.fetchWord(curaddr + i * dictentrysize + j*2);
 					for (k=2;k>=0;k--) {
-						curzchar = ((curword >> (k*5)) & 0x1f);
+						curzchar = curword >> k*5 & 0x1f;
 						if (curindex == encodedtoken.size()) {
 							if (curzchar != 5) {
 								match = false;
@@ -2919,20 +2918,20 @@ public class ZCPU extends Object implements Runnable {
             // Sneaky--in v1-4, there is 1 length byte at the front of the input buffer. In v5+,
             // there are 2. See zop_read.
             int bufferOffset;
-            if (version <= 4) {
+            if (this.version <= 4) {
                 bufferOffset = 1;
             } else {
                 bufferOffset = 2;
             }
             if (match) {
-				memory.putWord((vops[1] + 2 + (numtokens * 4)),(curaddr + (i * dictentrysize))); // Memory location of dictionary entry
-				memory.putByte((vops[1] + 2 + (numtokens * 4) + 2),thistoken.length()); // Length of word
-                memory.putByte((vops[1] + 2 + (numtokens * 4) + 3),(strpos + bufferOffset)); // Position in input buffer; see above
+                this.memory.putWord(this.vops[1] + 2 + numtokens * 4, curaddr + i * dictentrysize); // Memory location of dictionary entry
+                this.memory.putByte(this.vops[1] + 2 + numtokens * 4 + 2,thistoken.length()); // Length of word
+                this.memory.putByte(this.vops[1] + 2 + numtokens * 4 + 3, strpos + bufferOffset); // Position in input buffer; see above
 			}
 			else if (bit == 0) { // If bit is set, leave the slot alone
-				memory.putWord((vops[1] + 2 + (numtokens * 4)),0);
-				memory.putByte((vops[1] + 2 + (numtokens * 4) + 2),thistoken.length()); // Length of word
-				memory.putByte((vops[1] + 2 + (numtokens * 4) + 3),(strpos + bufferOffset)); // Position in input buffer; see above
+                this.memory.putWord(this.vops[1] + 2 + numtokens * 4,0);
+                this.memory.putByte(this.vops[1] + 2 + numtokens * 4 + 2,thistoken.length()); // Length of word
+                this.memory.putByte(this.vops[1] + 2 + numtokens * 4 + 3, strpos + bufferOffset); // Position in input buffer; see above
 			}
 
 
@@ -2941,7 +2940,7 @@ public class ZCPU extends Object implements Runnable {
 		}
 
 		// Finally, store the number of tokens tokenized in the parse buffer.
-		memory.putByte((vops[1] + 1),numtokens);
+        this.memory.putByte(this.vops[1] + 1,numtokens);
     }
 
     // ENCODE_TEXT baddr1 p n baddr2            V5+
@@ -2955,14 +2954,14 @@ public class ZCPU extends Object implements Runnable {
 
 		// First, make a string out of the text to encode.
 		s = new String();
-		for (i=0;i<vops[2];i++)
-			s = s + String.valueOf((char)memory.fetchByte(vops[0]+vops[1]+i));
+		for (i=0; i< this.vops[2]; i++)
+			s = s + String.valueOf((char) this.memory.fetchByte(this.vops[0]+ this.vops[1]+i));
 
 		// Encode it.
 		encodedstr = encodeZString(s);
 
 		// Now copy to memory, storing Z-characters appropriately and respecting length limits.
-		if (version < 4)
+		if (this.version < 4)
 			maxlen = 2;
 		else
 			maxlen = 3;
@@ -2973,26 +2972,26 @@ public class ZCPU extends Object implements Runnable {
 			w = 0;
 			if (curindex < encodedlen) {
 				n = (Integer)encodedstr.elementAt(curindex);
-				w = w | ((n.intValue() << 10) & 0x7c00);
+				w = w | n.intValue() << 10 & 0x7c00;
 				curindex++;
 			}
 			else
-				w = w | ((5 << 10) & 0x7c00);
+				w = w | 5 << 10 & 0x7c00;
 			if (curindex < encodedlen) {
 				n = (Integer)encodedstr.elementAt(curindex);
-				w = w | ((n.intValue() << 5) & 0x03e0);
+				w = w | n.intValue() << 5 & 0x03e0;
 				curindex++;
 			}
 			else
-				w = w | ((5 << 5) & 0x3e0);
+				w = w | 5 << 5 & 0x3e0;
 			if (curindex < encodedlen) {
 				n = (Integer)encodedstr.elementAt(curindex);
-				w = w | (n.intValue() & 0x001f);
+				w = w | n.intValue() & 0x001f;
 				curindex++;
 			}
 			else
 				w = w | 5;
-			memory.putWord((vops[2] + (i*2)),w);
+            this.memory.putWord(this.vops[2] + i*2,w);
 		}
     }
 
@@ -3002,25 +3001,25 @@ public class ZCPU extends Object implements Runnable {
         int i;
         int s;
 
-        s = signedWord(vops[2]);
+        s = signedWord(this.vops[2]);
 
         // If baddr2 is 0, zero the data at baddr1.
-        if (vops[1] == 0) {
+        if (this.vops[1] == 0) {
             for (i=0;i<s;i++)
-                memory.putByte(vops[0]+i,0);
+                this.memory.putByte(this.vops[0]+i,0);
             return;
         }
 
         // If s < 0, copy forwards
         if (s < 0) {
-            for (i=0;i<(-s);i++)
-                memory.putByte(vops[1]+i,memory.fetchByte(vops[0]+i));
+            for (i=0; i< -s; i++)
+                this.memory.putByte(this.vops[1]+i, this.memory.fetchByte(this.vops[0]+i));
             return;
         }
 
         // Otherwise, copy backwards
-        for (i=(s-1);i>=0;i--)
-            memory.putByte(vops[1]+i,memory.fetchByte(vops[0]+i));
+        for (i= s-1; i>=0; i--)
+            this.memory.putByte(this.vops[1]+i, this.memory.fetchByte(this.vops[0]+i));
         return;
     }
 
@@ -3032,11 +3031,11 @@ public class ZCPU extends Object implements Runnable {
         int c;
 
         // Get operands
-        baddr = vops[0];
-        x = vops[1];
-        if (numvops == 4) {
-            y = vops[2];
-            n = vops[3];
+        baddr = this.vops[0];
+        x = this.vops[1];
+        if (this.numvops == 4) {
+            y = this.vops[2];
+            n = this.vops[3];
         }
         else {
             y = 1;
@@ -3048,14 +3047,14 @@ public class ZCPU extends Object implements Runnable {
             return;
 
         // Print the table
-        Point p = zui.getCursorPosition();
+        Point p = this.zui.getCursorPosition();
         baseX = p.x;
         curY = p.y;
         lineAddr = baddr;
         for (int i=0;i<y;i++) {
             for (int j = 0;j<x;j++) {
-                c = memory.fetchByte(lineAddr + j);
-                ioCard.printString(String.valueOf((char)c));
+                c = this.memory.fetchByte(lineAddr + j);
+                this.ioCard.printString(String.valueOf((char)c));
             }
             lineAddr += x + n;
         }
@@ -3067,7 +3066,7 @@ public class ZCPU extends Object implements Runnable {
     // CHECK_ARG_COUNT n <branch>               V5+
     private void zop_check_arg_count()
     {
-        if (curCallFrame.argCount >= vops[0])
+        if (this.curCallFrame.argCount >= this.vops[0])
             doBranch();
         else
             dontBranch();
@@ -3088,41 +3087,41 @@ public class ZCPU extends Object implements Runnable {
 		int slen;
 
         // If there are no arguments, do a normal save
-        if (numvops == 0) {
+        if (this.numvops == 0) {
             zop_save();
             return;
         }
         
 		// Get a filename to save under
 		suggested = null;
-		if ((numvops > 2) && (vops[2] != 0)) {
-    		slen = memory.fetchByte(vops[2]);
+		if (this.numvops > 2 && this.vops[2] != 0) {
+    		slen = this.memory.fetchByte(this.vops[2]);
 	    	if (slen > 0) {
 		    	StringBuffer tmp = new StringBuffer();
 			    for (int i = 1;i <= slen;i++)
-				    tmp.append(String.valueOf((char)memory.fetchByte(vops[2]+i)));
+				    tmp.append(String.valueOf((char) this.memory.fetchByte(this.vops[2]+i)));
 			    suggested = tmp.toString();
     		}
     	}
-		fn = zui.getFilename("Save Auxiliary File",suggested,true);
+		fn = this.zui.getFilename("Save Auxiliary File",suggested,true);
 		if (fn == null) { // An error-probably user cancelled.
-			putVariable(curResult,0);
+			putVariable(this.curResult,0);
 			return;
 		}
 
 		try {
 			fos = new FileOutputStream(fn);
 			dos = new DataOutputStream(fos);
-			memory.dumpMemory(dos,vops[0],vops[1]);
+            this.memory.dumpMemory(dos, this.vops[0], this.vops[1]);
 			fos.close();
 		}
 		catch (IOException ex1) {
-			putVariable(curResult,0);
+			putVariable(this.curResult,0);
 			return;
 		}
 
 		// We did it!
-		putVariable(curResult,1);
+		putVariable(this.curResult,1);
     }
 
     // RESTORE [baddr1 n baddr2] <result>   V5+
@@ -3135,42 +3134,42 @@ public class ZCPU extends Object implements Runnable {
 		int slen;
 
         // If there are no arguments, do a normal restore
-        if (numvops == 0) {
+        if (this.numvops == 0) {
             zop_restore();
             return;
         }
         
 		// Get a filename to save under
 		suggested = null;
-		if ((numvops > 2) && (vops[2] != 0)) {
-    		slen = memory.fetchByte(vops[2]);
+		if (this.numvops > 2 && this.vops[2] != 0) {
+    		slen = this.memory.fetchByte(this.vops[2]);
 	    	if (slen > 0) {
 		    	StringBuffer tmp = new StringBuffer();
 			    for (int i = 1;i <= slen;i++)
-				    tmp.append(String.valueOf((char)memory.fetchByte(vops[2]+i)));
+				    tmp.append(String.valueOf((char) this.memory.fetchByte(this.vops[2]+i)));
 			    suggested = tmp.toString();
 	    	}
 	    }
-		fn = zui.getFilename("Load Auxiliary File",suggested,false);
+		fn = this.zui.getFilename("Load Auxiliary File",suggested,false);
 		if (fn == null) { // An error-probably user cancelled.
-			putVariable(curResult,0);
+			putVariable(this.curResult,0);
 			return;
 		}
 
 		try {
 			fis = new FileInputStream(fn);
 			dis = new DataInputStream(fis);
-			memory.readMemory(dis,vops[0],vops[1]);
+            this.memory.readMemory(dis, this.vops[0], this.vops[1]);
 			fis.close();
 		}
 		catch (IOException ex1) {
-			putVariable(curResult,0);
+			putVariable(this.curResult,0);
 			return;
 		}
 
 		// We did it!
-		if (version >= 3) {
-			putVariable(curResult,vops[1]);
+		if (this.version >= 3) {
+			putVariable(this.curResult, this.vops[1]);
 		}
     }
 
@@ -3180,14 +3179,14 @@ public class ZCPU extends Object implements Runnable {
         int val;
         int sop2;
 
-        sop2 = signedWord(vops[1]);
+        sop2 = signedWord(this.vops[1]);
 
         if (sop2 < 0)
-            val = vops[0] >>> Math.abs(sop2);
+            val = this.vops[0] >>> Math.abs(sop2);
         else
-            val = vops[0] << sop2;
+            val = this.vops[0] << sop2;
 
-        putVariable(curResult,val);
+        putVariable(this.curResult,val);
     }
 
     // ART_SHIFT a s <result>               V5+
@@ -3196,52 +3195,52 @@ public class ZCPU extends Object implements Runnable {
         int val;
         int sop2;
 
-        sop2 = signedWord(vops[1]);
+        sop2 = signedWord(this.vops[1]);
 
         if (sop2 < 0) {
-            if (((voptypes[0] == ARGTYPE_WORD) && ((vops[0] & 0x8000) == 0x8000)) ||
-                ((voptypes[0] == ARGTYPE_BYTE) && ((vops[0] & 0x80) == 0x80)))
-                val = vops[0] >> Math.abs(sop2);
+            if (this.voptypes[0] == this.ARGTYPE_WORD && (this.vops[0] & 0x8000) == 0x8000 ||
+                this.voptypes[0] == this.ARGTYPE_BYTE && (this.vops[0] & 0x80) == 0x80)
+                val = this.vops[0] >> Math.abs(sop2);
             else
-                val = vops[0] >>> Math.abs(sop2);
+                val = this.vops[0] >>> Math.abs(sop2);
         } else
-            val = vops[0] << sop2;
+            val = this.vops[0] << sop2;
 
-        putVariable(curResult,val);
+        putVariable(this.curResult,val);
     }
 
     // SET_FONT n <result>                  V5,7-8
     // SET_FONT n [window] <result>         V6
     private void zop_set_font()
     {
-		zui.setFont(vops[0]);
-		Dimension s = zui.getFontSize();
-		memory.putByte(0x26,s.height);
-		memory.putByte(0x27,s.width);
+        this.zui.setFont(this.vops[0]);
+		Dimension s = this.zui.getFontSize();
+        this.memory.putByte(0x26,s.height);
+        this.memory.putByte(0x27,s.width);
     }
 
     // DRAW_PICTURE pic [y x]               V6
     private void zop_draw_picture()
     {
-        zui.fatal("DRAW_PICTURE instruction unimplemented");
+        this.zui.fatal("DRAW_PICTURE instruction unimplemented");
     }
 
     // PICTURE_DATA pic baddr <branch>      V6
     private void zop_picture_data()
     {
-        zui.fatal("PICTURE_DATA instruction unimplemented");
+        this.zui.fatal("PICTURE_DATA instruction unimplemented");
     }
 
     // ERASE_PICTURE pic [y x]              V6
     private void zop_erase_picture()
     {
-        zui.fatal("ERASE_PICTURE instruction unimplemented");
+        this.zui.fatal("ERASE_PICTURE instruction unimplemented");
     }
 
     // SET_MARGINS xl xr window             V6
     private void zop_set_margins()
     {
-        zui.fatal("SET_MARGINS instruction unimplemented");
+        this.zui.fatal("SET_MARGINS instruction unimplemented");
     }
 
     // SAVE_UNDO <result>                   V5+
@@ -3254,18 +3253,18 @@ public class ZCPU extends Object implements Runnable {
         	bos = new ByteArrayOutputStream(65536);
 	    	dos = new DataOutputStream(bos);
 		    dumpState(dos);
-		    memory.dumpMemory(dos,0,dynamicMemorySize);
-		    undoState = bos.toByteArray();
+            this.memory.dumpMemory(dos,0, this.dynamicMemorySize);
+            this.undoState = bos.toByteArray();
         }
         catch (IOException ioex) {
-            zui.fatal("I/O exception during SAVE_UNDO??");
+            this.zui.fatal("I/O exception during SAVE_UNDO??");
         }
 
 		// We did it!
-		if (version <= 3)
+		if (this.version <= 3)
 			doBranch();
 		else
-			putVariable(curResult,1);
+			putVariable(this.curResult,1);
     }
 
     // RESTORE_UNDO <result>                V5+
@@ -3276,101 +3275,101 @@ public class ZCPU extends Object implements Runnable {
 		int tsBit;
 
 		// Remember the transcript bit
-		tsBit = memory.fetchWord(0x10) & 0x0001;
+		tsBit = this.memory.fetchWord(0x10) & 0x0001;
 
 		try {
-			bis = new ByteArrayInputStream(undoState);
+			bis = new ByteArrayInputStream(this.undoState);
 			dis = new DataInputStream(bis);
 			readState(dis);
-			memory.readMemory(dis,0,dynamicMemorySize);
+            this.memory.readMemory(dis,0, this.dynamicMemorySize);
 		}
 		catch (IOException ex1) {
-		    zui.fatal("I/O Exception during RESTORE_UNDO???");
+            this.zui.fatal("I/O Exception during RESTORE_UNDO???");
 		}
 
 		// We did it!
-		memory.putWord(0x10,memory.fetchWord(0x10) | tsBit);
-		if (version >= 3) {
-			curResult = memory.fetchByte(curCallFrame.pc - 1);
-			putVariable(curResult,2); // Is this correct?
+        this.memory.putWord(0x10, this.memory.fetchWord(0x10) | tsBit);
+		if (this.version >= 3) {
+            this.curResult = this.memory.fetchByte(this.curCallFrame.pc - 1);
+			putVariable(this.curResult,2); // Is this correct?
 		}
     }
 
     // MOVE_WINDOW window y x               V6
     private void zop_move_window()
     {
-        zui.fatal("MOVE_WINDOW instruction unimplemented");
+        this.zui.fatal("MOVE_WINDOW instruction unimplemented");
     }
 
     // WINDOW_SIZE window y x               V6
     private void zop_window_size()
     {
-        zui.fatal("WINDOW_SIZE instruction unimplemented");
+        this.zui.fatal("WINDOW_SIZE instruction unimplemented");
     }
 
     // WINDOW_STYLE window flags op         V6
     private void zop_window_style()
     {
-        zui.fatal("WINDOW_STYLE instruction unimplemented");
+        this.zui.fatal("WINDOW_STYLE instruction unimplemented");
     }
 
     // GET_WIND_PROP window p <result>    V6
     private void zop_get_wind_prop()
     {
-        zui.fatal("GET_WINDOW_PROP instruction unimplemented");
+        this.zui.fatal("GET_WINDOW_PROP instruction unimplemented");
     }
 
     // SCROLL_WINDOW window s               V6
     private void zop_scroll_window()
     {
-        zui.fatal("SCROLL_WINDOW instruction unimplemented");
+        this.zui.fatal("SCROLL_WINDOW instruction unimplemented");
     }
 
     // POP_STACK n [baddr]                  V6
     private void zop_pop_stack()
     {
-        zui.fatal("POP_STACK instruction unimplemented");
+        this.zui.fatal("POP_STACK instruction unimplemented");
     }
 
     // READ_MOUSE baddr                     V6
     private void zop_read_mouse()
     {
-        zui.fatal("READ_MOUSE instruction unimplemented");
+        this.zui.fatal("READ_MOUSE instruction unimplemented");
     }
 
     // MOUSE_WINDOW window                  V6
     private void zop_mouse_window()
     {
-        zui.fatal("MOUSE_WINDOW instruction unimplemented");
+        this.zui.fatal("MOUSE_WINDOW instruction unimplemented");
     }
 
     // PUSH_STACK a baddr <branch>          V6
     private void zop_push_stack()
     {
-        zui.fatal("PUSH_STACK instruction unimplemented");
+        this.zui.fatal("PUSH_STACK instruction unimplemented");
     }
 
     // PUT_WIND_PROP window p a             V6
     private void zop_put_wind_prop()
     {
-        zui.fatal("PUT_WIND_PROP instruction unimplemented");
+        this.zui.fatal("PUT_WIND_PROP instruction unimplemented");
     }
 
     // PRINT_FORM baddr                     V6
     private void zop_print_form()
     {
-        zui.fatal("PRINT_FORM instruction unimplemented");
+        this.zui.fatal("PRINT_FORM instruction unimplemented");
     }
 
     // MAKE_MENU n baddr <branch>           V6
     private void zop_make_menu()
     {
-        zui.fatal("MAKE_MENU instruction unimplemented");
+        this.zui.fatal("MAKE_MENU instruction unimplemented");
     }
 
     // PICTURE_TABLE baddr                  V6
     private void zop_picture_table()
     {
-        zui.fatal("PICTURE_TABLE instruction unimplemented");
+        this.zui.fatal("PICTURE_TABLE instruction unimplemented");
     }
 }

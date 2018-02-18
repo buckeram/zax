@@ -38,7 +38,7 @@ class ZIOCard extends Object {
     private int inputStream, outputStream;
 	private boolean buffer; // If true, we only output text to the screen when the outputFlush method is called.
 	private StringBuffer outputBuffer;
-    private boolean[] isOpen = {false,true,true,true,true};
+    private final boolean[] isOpen = {false,true,true,true,true};
     private int baseMemAddr; // Base address of output stream 3 (or start of line in multiline mode)
     private int curMemAddr; // Current address on output stream 3
     private int memWidth; // Width of output stream 3
@@ -51,13 +51,13 @@ class ZIOCard extends Object {
     // storyfile.
     void initialize(ZUserInterface ui,ZMemory mem,int ver,boolean buf)
     {
-        zui = ui;
-        memory = mem;
-        version = ver;
-        outputStream = 1;
-        inputStream = 0;
-		buffer = buf;
-		outputBuffer = new StringBuffer();
+        this.zui = ui;
+        this.memory = mem;
+        this.version = ver;
+        this.outputStream = 1;
+        this.inputStream = 0;
+        this.buffer = buf;
+        this.outputBuffer = new StringBuffer();
     }
 
     // Print a string to the current output stream
@@ -66,24 +66,24 @@ class ZIOCard extends Object {
         int n;
 
         // Ignore anything destined for a closed stream
-        if (isOpen[outputStream] == false)
+        if (this.isOpen[this.outputStream] == false)
             return;
-        switch (outputStream) {
+        switch (this.outputStream) {
             case 1 : // Screen -- currently, we send this right on to the user interface unless buffering
-				if (buffer)
-					outputBuffer.append(s);
+				if (this.buffer)
+                    this.outputBuffer.append(s);
 				else
-					zui.showString(s);
+                    this.zui.showString(s);
                 break;
             case 2 : // For now, transcript stuff goes to stdout
                 System.out.print(s);
                 break;
             case 3 : // Memory
-                if (!memMultiLine) { // Single-line mode--this is easy
+                if (!this.memMultiLine) { // Single-line mode--this is easy
                     for (n = 0;n < s.length();n++)
-                        memory.putByte(curMemAddr+n,s.charAt(n));
-                    curMemAddr += s.length();
-                    memory.putWord(baseMemAddr,(memory.fetchWord(baseMemAddr) + s.length()));
+                        this.memory.putByte(this.curMemAddr +n,s.charAt(n));
+                    this.curMemAddr += s.length();
+                    this.memory.putWord(this.baseMemAddr, this.memory.fetchWord(this.baseMemAddr) + s.length());
                 }
                 else { // Multi-line mode.  Bleh.
                     // First, make a StringTokenizer out of this string
@@ -91,20 +91,20 @@ class ZIOCard extends Object {
                     while (st.hasMoreTokens()) {
                         String tok = st.nextToken();
                         if (tok.equals("\n")) { // Start a new line
-                            memory.putWord(curMemAddr,0);
-                            baseMemAddr = curMemAddr;
-                            curMemAddr += 2;
+                            this.memory.putWord(this.curMemAddr,0);
+                            this.baseMemAddr = this.curMemAddr;
+                            this.curMemAddr += 2;
                         }
                         else { // Add to this line, wrap if necessary
-                            if ((memCursorX + tok.length()) > (memWidth - 2)) { // Wrap
-                                memory.putWord(curMemAddr,0);
-                                baseMemAddr = curMemAddr;
-                                curMemAddr += 2;
+                            if (this.memCursorX + tok.length() > this.memWidth - 2) { // Wrap
+                                this.memory.putWord(this.curMemAddr,0);
+                                this.baseMemAddr = this.curMemAddr;
+                                this.curMemAddr += 2;
                             }
                             for (n = 0;n < tok.length();n++)
-                                memory.putByte(curMemAddr+n,tok.charAt(n));
-                            curMemAddr += tok.length();
-                            memory.putWord(baseMemAddr,(memory.fetchWord(baseMemAddr) + tok.length()));
+                                this.memory.putByte(this.curMemAddr +n,tok.charAt(n));
+                            this.curMemAddr += tok.length();
+                            this.memory.putWord(this.baseMemAddr, this.memory.fetchWord(this.baseMemAddr) + tok.length());
                         }
                     }
                 }
@@ -118,62 +118,62 @@ class ZIOCard extends Object {
 	// If we're not buffering, ignore.
 	void outputFlush()
 	{
-		if (!buffer)
+		if (!this.buffer)
 			return;
-		if (outputBuffer.length() == 0)
+		if (this.outputBuffer.length() == 0)
 			return;
 
-		zui.showString(outputBuffer.toString());
-		outputBuffer = new StringBuffer();
+        this.zui.showString(this.outputBuffer.toString());
+        this.outputBuffer = new StringBuffer();
 	}
 
     // Set output stream.
     void setOutputStream(int s,int baddr,int w,boolean multiLine)
     {
         if (s < 0) {
-            isOpen[-s] = false;
-            outputStream = 1; // This doesn't seem to be in the specification--or am I missing it?
+            this.isOpen[-s] = false;
+            this.outputStream = 1; // This doesn't seem to be in the specification--or am I missing it?
             return;
         }
 
-        if ((s == 0) || (s > 4))
-            zui.fatal("Illegal output stream: " + s);
+        if (s == 0 || s > 4)
+            this.zui.fatal("Illegal output stream: " + s);
 
         if (s == 3) { // Open a memory stream
-            memMultiLine = multiLine;
-            baseMemAddr = baddr;
-            memory.putWord(baseMemAddr,0);
-            curMemAddr = baseMemAddr + 2;
-            if (memMultiLine) {
+            this.memMultiLine = multiLine;
+            this.baseMemAddr = baddr;
+            this.memory.putWord(this.baseMemAddr,0);
+            this.curMemAddr = this.baseMemAddr + 2;
+            if (this.memMultiLine) {
                 if (w < 0)
-                    memWidth = -w;
+                    this.memWidth = -w;
                 else {
-                    Dimension d = zui.getWindowSize(w);
-                    memWidth = d.width;
+                    Dimension d = this.zui.getWindowSize(w);
+                    this.memWidth = d.width;
                 }
-                memCursorX = 0;
+                this.memCursorX = 0;
             }
-			outputStream = 3;
-			isOpen[3] = true;
+            this.outputStream = 3;
+            this.isOpen[3] = true;
         }
         else if (s == 4)
-            zui.fatal("Output stream 4 not yet supported");
+            this.zui.fatal("Output stream 4 not yet supported");
         else {
-            outputStream = s;
-            isOpen[s] = true;
+            this.outputStream = s;
+            this.isOpen[s] = true;
         }
     }
 
     // Set input stream
     void setInputStream(int s)
     {
-        if ((s < 0) || (s > 1))
-            zui.fatal("Illegal input stream: " + s);
+        if (s < 0 || s > 1)
+            this.zui.fatal("Illegal input stream: " + s);
 
         if (s == 1)
-            zui.fatal("Input stream 1 unsupported");
+            this.zui.fatal("Input stream 1 unsupported");
         else
-            inputStream = s;
+            this.inputStream = s;
     }
 
     // Read from current input stream.  Currently just uses zui.readString().
@@ -181,7 +181,7 @@ class ZIOCard extends Object {
     // Return 0 if there was a timeout.
     int readLine(StringBuffer sb,int time)
     {
-        return zui.readLine(sb,time);
+        return this.zui.readLine(sb,time);
     }
 
 	// Read a character from the current input stream.
@@ -189,7 +189,7 @@ class ZIOCard extends Object {
 	{
 		int c;
 
-		c = zui.readChar(time);
+		c = this.zui.readChar(time);
 		return c;
 	}
 }

@@ -42,22 +42,22 @@ class ZObjectTable extends Object {
     // of the current storyfile.
     void initialize(ZUserInterface ui,ZMemory mem,int ver)
     {
-        zui = ui;
-        memory = mem;
-        version = ver;
+        this.zui = ui;
+        this.memory = mem;
+        this.version = ver;
 
-        objTable = memory.fetchWord(0x0a);
-        if (version <= 3) {
-            defaultsSize = 62;
-            objAttrSize = 4;
-            objHandleSize = 1;
+        this.objTable = this.memory.fetchWord(0x0a);
+        if (this.version <= 3) {
+            this.defaultsSize = 62;
+            this.objAttrSize = 4;
+            this.objHandleSize = 1;
         }
         else {
-            defaultsSize = 126;
-            objAttrSize = 6;
-            objHandleSize = 2;
+            this.defaultsSize = 126;
+            this.objAttrSize = 6;
+            this.objHandleSize = 2;
         }
-        objEntrySize = (objAttrSize + (3 * objHandleSize) + 2);
+        this.objEntrySize = this.objAttrSize + 3 * this.objHandleSize + 2;
     }
 
     /////////////////////////////////////////////////////////////////
@@ -69,10 +69,10 @@ class ZObjectTable extends Object {
     {
         int sib;
 
-        if (version <= 3)
-            sib = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + objHandleSize);
+        if (this.version <= 3)
+            sib = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + this.objHandleSize);
         else
-            sib = memory.fetchWord(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + objHandleSize);
+            sib = this.memory.fetchWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + this.objHandleSize);
 
         return sib;
     }
@@ -80,10 +80,10 @@ class ZObjectTable extends Object {
     // Set the sibling of an object
     void setSibling(int obj,int sib)
     {
-        if (version <= 3)
-            memory.putByte((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + objHandleSize),sib);
+        if (this.version <= 3)
+            this.memory.putByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + this.objHandleSize,sib);
         else
-            memory.putWord((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + objHandleSize),sib);
+            this.memory.putWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + this.objHandleSize,sib);
     }
 
     // Return the first child of an object
@@ -91,10 +91,10 @@ class ZObjectTable extends Object {
     {
         int child;
 
-        if (version <= 3)
-            child = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + (2 * objHandleSize));
+        if (this.version <= 3)
+            child = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + 2 * this.objHandleSize);
         else
-            child = memory.fetchWord(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + (2 * objHandleSize));
+            child = this.memory.fetchWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + 2 * this.objHandleSize);
 
         return child;
     }
@@ -102,10 +102,10 @@ class ZObjectTable extends Object {
     // Set the child of an object
     void setChild(int obj,int child)
     {
-        if (version <= 3)
-            memory.putByte((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + (2 * objHandleSize)),child);
+        if (this.version <= 3)
+            this.memory.putByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + 2 * this.objHandleSize,child);
         else
-            memory.putWord((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + (2 * objHandleSize)),child);
+            this.memory.putWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + 2 * this.objHandleSize,child);
     }
 
     // Return an object's parent
@@ -113,10 +113,10 @@ class ZObjectTable extends Object {
     {
         int parent;
 
-        if (version <= 3)
-            parent = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize);
+        if (this.version <= 3)
+            parent = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize);
         else
-            parent = memory.fetchWord(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize);
+            parent = this.memory.fetchWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize);
 
         return parent;
     }
@@ -124,10 +124,10 @@ class ZObjectTable extends Object {
     // Set the parent of an object
     void setParent(int obj,int parent)
     {
-        if (version <= 3)
-            memory.putByte((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize),parent);
+        if (this.version <= 3)
+            this.memory.putByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize,parent);
         else
-            memory.putWord((objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize),parent);
+            this.memory.putWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize,parent);
     }
 
     // Given its (non-zero) parent, remove an object from the
@@ -142,7 +142,7 @@ class ZObjectTable extends Object {
 
         curObj = getChild(parent);
         if (curObj == 0)
-            zui.fatal("Corrupted object table");
+            this.zui.fatal("Corrupted object table");
         if (curObj == obj) {
             // Remove the object
             setChild(parent,getSibling(obj));
@@ -155,7 +155,7 @@ class ZObjectTable extends Object {
         // and its predecessor.
         prevObj = curObj;
         curObj = getSibling(prevObj);
-        while ((curObj != obj) && (curObj != 0)) {
+        while (curObj != obj && curObj != 0) {
             prevObj = curObj;
             curObj = getSibling(prevObj);
         }
@@ -163,7 +163,7 @@ class ZObjectTable extends Object {
         // If we get here, curObj is either the object we're looking
         // for or 0 (which is an error).
         if (curObj == 0)
-            zui.fatal("Corrupted object table");
+            this.zui.fatal("Corrupted object table");
 
         // Remove the object from the chain, and set its sibling and parent to 0.
         setSibling(prevObj,getSibling(curObj));
@@ -202,14 +202,14 @@ class ZObjectTable extends Object {
         int b;
         int length;
 
-        b = memory.fetchByte(baddr-1);
-        if (version < 4)
-            length = (((b >> 5) & 0x07) + 1);
+        b = this.memory.fetchByte(baddr-1);
+        if (this.version < 4)
+            length = (b >> 5 & 0x07) + 1;
         else {
             if ((b & 0x80) == 0x80)
-                length = (b & 0x3f);
+                length = b & 0x3f;
             else
-                length = (((b >> 6) & 0x01) + 1);
+                length = (b >> 6 & 0x01) + 1;
         }
         return length;
     }
@@ -219,7 +219,7 @@ class ZObjectTable extends Object {
     {
         int addr;
 
-        addr = memory.fetchWord(objTable + defaultsSize + ((obj - 1) * objEntrySize) + objAttrSize + (3 * objHandleSize));
+        addr = this.memory.fetchWord(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + this.objAttrSize + 3 * this.objHandleSize);
         return addr;
     }
 
@@ -239,26 +239,26 @@ class ZObjectTable extends Object {
 
         // Now step through, looking for the specified property.
         // Start by jumping over text header.
-		o = memory.fetchByte(p);
-        p = p + (o * 2) + 1;
+		o = this.memory.fetchByte(p);
+        p = p + o * 2 + 1;
 
         // Now we're at the start of the property table.
-        s = memory.fetchByte(p);
+        s = this.memory.fetchByte(p);
         while (s != 0) {
             // Get the property number and the size of this property.
-            if (version < 4) {
-                pnum = (s & 0x1f);
-                psize = ((s >> 5) & 0x07) + 1;
+            if (this.version < 4) {
+                pnum = s & 0x1f;
+                psize = (s >> 5 & 0x07) + 1;
             }
             else {
-                pnum = (s & 0x3f);
+                pnum = s & 0x3f;
                 if ((s & 0x80) == 0x80) {
                     p++;
-                    psize = memory.fetchByte(p);
+                    psize = this.memory.fetchByte(p);
                     psize = psize & 0x3f;
                 }
                 else
-                    psize = ((s >> 6) & 0x03) + 1;
+                    psize = (s >> 6 & 0x03) + 1;
             }
 
             // Step over the size byte
@@ -270,7 +270,7 @@ class ZObjectTable extends Object {
                 return p;
             else
                 p = p + psize;
-			s = memory.fetchByte(p);
+			s = this.memory.fetchByte(p);
         }
 
         // If we make it here, the property was not found.
@@ -291,12 +291,12 @@ class ZObjectTable extends Object {
         // the appropriate value from the defaults table.
         if (pdata > 0) {
             if (getPropertyLength(pdata) == 1)
-                return memory.fetchByte(pdata);
+                return this.memory.fetchByte(pdata);
             else
-                return memory.fetchWord(pdata);
+                return this.memory.fetchWord(pdata);
         }
         else
-            return memory.fetchWord(objTable + ((prop - 1) * 2));
+            return this.memory.fetchWord(this.objTable + (prop - 1) * 2);
     }
 
     // Return the property number of the property that follows
@@ -313,13 +313,13 @@ class ZObjectTable extends Object {
         if (prop == 0) {
             propaddr = getPropertyList(obj);
             // Skip over text-length byte and text header
-            propaddr = propaddr + 1 + (memory.fetchByte(propaddr) * 2);
+            propaddr = propaddr + 1 + this.memory.fetchByte(propaddr) * 2;
             // Return the number of the first property.
             // This will work if the property number is 0, too.
-            if (version < 4)
-                propnum = memory.fetchByte(propaddr) & 0x1f;
+            if (this.version < 4)
+                propnum = this.memory.fetchByte(propaddr) & 0x1f;
             else
-                propnum = memory.fetchByte(propaddr) & 0x3f;
+                propnum = this.memory.fetchByte(propaddr) & 0x3f;
             return propnum;
         }
 
@@ -337,10 +337,10 @@ class ZObjectTable extends Object {
 
         // Now return the number of the next property.  This will
         // return 0 if the property is a 0 byte.
-        if (version < 4)
-            propnum = memory.fetchByte(propaddr) & 0x1f;
+        if (this.version < 4)
+            propnum = this.memory.fetchByte(propaddr) & 0x1f;
         else
-            propnum = memory.fetchByte(propaddr) & 0x3f;
+            propnum = this.memory.fetchByte(propaddr) & 0x3f;
         return propnum;
     }
 
@@ -370,9 +370,9 @@ class ZObjectTable extends Object {
         // Now set the property, depending on its length.
         proplen = getPropertyLength(propaddr);
         if (proplen == 1)
-            memory.putByte(propaddr,(value & 0xff));
+            this.memory.putByte(propaddr, value & 0xff);
         else
-            memory.putWord(propaddr,value);
+            this.memory.putWord(propaddr,value);
     }
 
 
@@ -398,11 +398,8 @@ class ZObjectTable extends Object {
         bitmask = 0x80 >>> whichbit;
 
         // Now get the appropriate byte and test it.
-        attrbyte = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + (whichbyte));
-        if ((attrbyte & bitmask) == bitmask)
-            return true;
-        else
-            return false;
+        attrbyte = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + whichbyte);
+        return (attrbyte & bitmask) == bitmask;
     }
 
     // Set an attribute on an object.
@@ -422,9 +419,9 @@ class ZObjectTable extends Object {
         bitmask = 0x80 >>> whichbit;
 
         // Now get the appropriate byte and set it.
-        attrbyte = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + (whichbyte));
+        attrbyte = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + whichbyte);
         attrbyte = attrbyte | bitmask;
-        memory.putByte((objTable + defaultsSize + ((obj - 1) * objEntrySize) + (whichbyte)),attrbyte);
+        this.memory.putByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + whichbyte,attrbyte);
     }
 
     // Clear an attribute on an object.
@@ -444,9 +441,9 @@ class ZObjectTable extends Object {
         bitmask = 0x80 >>> whichbit;
 
         // Now get the appropriate byte and clear it.
-        attrbyte = memory.fetchByte(objTable + defaultsSize + ((obj - 1) * objEntrySize) + (whichbyte));
-        attrbyte = ((attrbyte & ~bitmask) & 0xff);
-        memory.putByte((objTable + defaultsSize + ((obj - 1) * objEntrySize) + (whichbyte)),attrbyte);
+        attrbyte = this.memory.fetchByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + whichbyte);
+        attrbyte = attrbyte & ~bitmask & 0xff;
+        this.memory.putByte(this.objTable + this.defaultsSize + (obj - 1) * this.objEntrySize + whichbyte,attrbyte);
     }
 
 }

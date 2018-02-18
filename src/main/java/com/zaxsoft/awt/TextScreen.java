@@ -72,8 +72,10 @@ public class TextScreen extends java.awt.Component
     private StringBuffer readString; // String currently being read
     private int readTerminator; // Key that terminated most recent READLINE
     private int curReadChar; // Character from most recent READCHAR
-    private FontMetrics curFontMetrics; // Current font metrics
-    private int fontHeight, fontMaxWidth, fontAscent; // Size of current font
+    private final FontMetrics curFontMetrics; // Current font metrics
+    private final int fontHeight;
+    private final int fontMaxWidth;
+    private final int fontAscent; // Size of current font
     private Rectangle curRegion; // Rectangle describing active region
     private Vector terminators; // Characters that terminate a line of input
     private Image offscreen; // Image used for offscreen drawing
@@ -90,45 +92,46 @@ public class TextScreen extends java.awt.Component
         
         public TextScreenKeyboardEventHandler(TextScreen myParent)
         {
-            parentObject = myParent;
+            this.parentObject = myParent;
         }
         
+        @Override
         public void keyTyped(java.awt.event.KeyEvent e)
         {
             int key = (int)e.getKeyChar();
             
-            switch (parentObject.state)
+            switch (this.parentObject.state)
             {
                 case TextScreen.READLINE : // Reading a line
-                    if (parentObject.terminators.contains(new Integer(key)))
+                    if (this.parentObject.terminators.contains(new Integer(key)))
                     {
-                        parentObject.state = WRITE;
-                        parentObject.readTerminator = key;
-                        if ((((char)key == '\r') || ((char)key == '\n')) && ((parentObject.attributes & KEYECHO) == KEYECHO))
-                            parentObject.printString("\n");
-                        parentObject.readThread.interrupt();
+                        this.parentObject.state = WRITE;
+                        this.parentObject.readTerminator = key;
+                        if (((char)key == '\r' || (char)key == '\n') && (this.parentObject.attributes & KEYECHO) == KEYECHO)
+                            this.parentObject.printString("\n");
+                        this.parentObject.readThread.interrupt();
                         return;
                     }
-                    if (((parentObject.attributes & KEYECHO) == KEYECHO) && !((((char)key) == '\b') && (parentObject.readString.length() == 0)))
-                        parentObject.printString(String.valueOf((char)key));
+                    if ((this.parentObject.attributes & KEYECHO) == KEYECHO && !((char)key == '\b' && this.parentObject.readString.length() == 0))
+                        this.parentObject.printString(String.valueOf((char)key));
                     switch ((char)key)
                     {
                         case '\b' : 
-                            if (parentObject.readString.length() > 0)
-                                parentObject.readString.setLength(parentObject.readString.length() - 1);
+                            if (this.parentObject.readString.length() > 0)
+                                this.parentObject.readString.setLength(this.parentObject.readString.length() - 1);
                             break;
                         default :
-                            parentObject.readString.append(String.valueOf((char)key));
+                            this.parentObject.readString.append(String.valueOf((char)key));
                             break;
                     }
                     return;
 
                 case READCHAR :
-                    parentObject.curReadChar = key;
-                    if ((parentObject.attributes & KEYECHO) == KEYECHO)
-                        parentObject.printString(String.valueOf((char)key));
-                    parentObject.state = WRITE;
-                    parentObject.readThread.interrupt();
+                    this.parentObject.curReadChar = key;
+                    if ((this.parentObject.attributes & KEYECHO) == KEYECHO)
+                        this.parentObject.printString(String.valueOf((char)key));
+                    this.parentObject.state = WRITE;
+                    this.parentObject.readThread.interrupt();
                     return;
                     
                 case WRITE :
@@ -154,38 +157,37 @@ public class TextScreen extends java.awt.Component
     public TextScreen(Font initialFont,Color bgColor,Color fgColor,
                         int initialRows,int initialCols,int attrs)
     {
-        super();
-        
+
         // Initialize variables
-        rows = initialRows;
-        cols = initialCols;
-        attributes = attrs;
-        rvsMode = false;
-        state = WRITE;
+        this.rows = initialRows;
+        this.cols = initialCols;
+        this.attributes = attrs;
+        this.rvsMode = false;
+        this.state = WRITE;
         setBackground(bgColor);
         setForeground(fgColor);
         setFont(initialFont);
         
         // Set up fonts and related variables
-        curFontMetrics = getFontMetrics(getFont());
-        fontHeight = curFontMetrics.getHeight();
+        this.curFontMetrics = getFontMetrics(getFont());
+        this.fontHeight = this.curFontMetrics.getHeight();
         if (getFont().getName().equals("Monospaced"))
-            fontMaxWidth = curFontMetrics.charWidth('W'); // getMaxAdvance is sometimes misleading for fixed-width fonts
+            this.fontMaxWidth = this.curFontMetrics.charWidth('W'); // getMaxAdvance is sometimes misleading for fixed-width fonts
         else
-            fontMaxWidth = curFontMetrics.getMaxAdvance(); 
+            this.fontMaxWidth = this.curFontMetrics.getMaxAdvance();
 //        fontMaxWidth = 0;
 //        int widths[] = curFontMetrics.getWidths();
 //        for (int i = 0; i < 128; i++)
 //            if (widths[i] > fontMaxWidth)
 //                fontMaxWidth = widths[i];
-        fontAscent = curFontMetrics.getMaxAscent();
+        this.fontAscent = this.curFontMetrics.getMaxAscent();
         
         // Set the default region, which is the entire screen
-        curRegion = new Rectangle(0,0,cols,rows);
+        this.curRegion = new Rectangle(0,0, this.cols, this.rows);
         
         // Initialize terminating characters.  CR is one by default.
-        terminators = new Vector();
-        terminators.addElement(new Integer(13));
+        this.terminators = new Vector();
+        this.terminators.addElement(new Integer(13));
         
         // Add key listener
         addKeyListener(new TextScreenKeyboardEventHandler(this));
@@ -200,7 +202,7 @@ public class TextScreen extends java.awt.Component
     */
     public void setTerminators(Vector chars)
     {
-        terminators = (Vector)chars.clone();
+        this.terminators = (Vector)chars.clone();
     }
     
     /** Returns a vector of the current terminators.
@@ -209,7 +211,7 @@ public class TextScreen extends java.awt.Component
     */
     public Vector getTerminators()
     {
-        return terminators;
+        return this.terminators;
     }
     
     /** Resizes the TextScreen to fit the current font, rows and columns.
@@ -221,14 +223,14 @@ public class TextScreen extends java.awt.Component
         int width, height;
         
         // Compute the size and resize the component
-        height = fontHeight * rows;
-        width = fontMaxWidth * cols;
+        height = this.fontHeight * this.rows;
+        width = this.fontMaxWidth * this.cols;
         setSize(width,height);
-        curRegion = new Rectangle(0,0,cols,rows);
+        this.curRegion = new Rectangle(0,0, this.cols, this.rows);
         
         // Get a new offscreen drawing area
         Dimension s = getSize();
-        offscreen = createImage(s.width,s.height);
+        this.offscreen = createImage(s.width,s.height);
         clearScreen();
     }
 
@@ -236,16 +238,17 @@ public class TextScreen extends java.awt.Component
     */
     public void clearScreen()
     {
-        Graphics g = offscreen.getGraphics();
+        Graphics g = this.offscreen.getGraphics();
         g.setColor(getBackground());
-        g.fillRect(curRegion.x*fontMaxWidth,
-                   curRegion.y*fontHeight,
-                   curRegion.width*fontMaxWidth,
-                   curRegion.height*fontHeight);
-        curRow = curRegion.x;
-        curCol = curRegion.y;
-        cursorX = curCol * fontMaxWidth;
-        cursorY = curRow * fontHeight;
+        g.fillRect(
+            this.curRegion.x* this.fontMaxWidth,
+            this.curRegion.y* this.fontHeight,
+            this.curRegion.width* this.fontMaxWidth,
+            this.curRegion.height* this.fontHeight);
+        this.curRow = this.curRegion.x;
+        this.curCol = this.curRegion.y;
+        this.cursorX = this.curCol * this.fontMaxWidth;
+        this.cursorY = this.curRow * this.fontHeight;
         g = getGraphics();
         paint(g);
     }
@@ -256,7 +259,7 @@ public class TextScreen extends java.awt.Component
     */
     public void setRegion(Rectangle region)
     {
-        curRegion = region;
+        this.curRegion = region;
     }
     
     /** Get the current region.
@@ -265,7 +268,7 @@ public class TextScreen extends java.awt.Component
     */
     public Rectangle getRegion()
     {
-        return curRegion;
+        return this.curRegion;
     }
     
     /** Print a string, wrapping as necessary.  Affected by region.
@@ -275,12 +278,12 @@ public class TextScreen extends java.awt.Component
     public void printString(String str)
     {
         Dimension s = getSize();
-        Graphics g = offscreen.getGraphics();
+        Graphics g = this.offscreen.getGraphics();
         int maxRow, maxCol;
         
         // Determine last row and last column (absolute) based on region
-        maxCol = curRegion.x + curRegion.width;
-        maxRow = curRegion.y + curRegion.height;
+        maxCol = this.curRegion.x + this.curRegion.width;
+        maxRow = this.curRegion.y + this.curRegion.height;
         
         // Set color and font in graphics context
         g.setColor(getForeground());
@@ -299,16 +302,16 @@ public class TextScreen extends java.awt.Component
             if (token.equals("\n"))
             {
                 // Cursor X position becomes start of new line
-                cursorX = curRegion.x * fontMaxWidth;
-                curCol = curRegion.x;
+                this.cursorX = this.curRegion.x * this.fontMaxWidth;
+                this.curCol = this.curRegion.x;
                 
                 // Scroll if necessary
-                if ((curRow + 1) == maxRow)
+                if (this.curRow + 1 == maxRow)
                     scrollUp(1); // As a side effect, curRow is decremented and cursorY is set up a line
                 
                 // Update Y position of cursor, then go to next token
-                curRow++;
-                cursorY = cursorY + fontHeight;
+                this.curRow++;
+                this.cursorY = this.cursorY + this.fontHeight;
                 continue;
             }
             
@@ -319,14 +322,14 @@ public class TextScreen extends java.awt.Component
                 // If we are, go to the end of the previous line.  If we are at
                 // 0,0 in the current region, just erase the current character.
                 // Is this last behavior correct?  Does it work with ZMachine?
-                if (curCol > curRegion.x)
-                    gotoXY(curCol-1,curRow);
-                else if (curRow > curRegion.y)
-                    gotoXY(cols-1,curRow-1);
+                if (this.curCol > this.curRegion.x)
+                    gotoXY(this.curCol -1, this.curRow);
+                else if (this.curRow > this.curRegion.y)
+                    gotoXY(this.cols -1, this.curRow -1);
                 
                 // Clear the current character
                 g.setColor(getBackground());
-                g.fillRect(cursorX,cursorY,fontMaxWidth,fontHeight);
+                g.fillRect(this.cursorX, this.cursorY, this.fontMaxWidth, this.fontHeight);
                 g.setColor(getForeground());
                 
                 // Go to next token
@@ -336,7 +339,7 @@ public class TextScreen extends java.awt.Component
             // If this is a CR (not a newline), go to the beginning of the current line.
             if (token.equals("\r"))
             {
-                gotoXY(curRegion.x,curRow);
+                gotoXY(this.curRegion.x, this.curRow);
                 continue;
             }
             
@@ -345,66 +348,68 @@ public class TextScreen extends java.awt.Component
             // last line.  After wrapping, token will be printed by default.
             // Wrapping is based on characters, not pixels, so this will look
             // pretty strange in a non-proportional font.
-            if((attributes & AUTOWRAP) == AUTOWRAP)
+            if((this.attributes & AUTOWRAP) == AUTOWRAP)
             {
-                while ((curCol + token.length()) >= maxCol)
+                while (this.curCol + token.length() >= maxCol)
                 {
                     // Draw what we can, do a newline, reduce the string.
-                    String sub = token.substring(0,(maxCol - curCol));
+                    String sub = token.substring(0, maxCol - this.curCol);
                     
-                    if (rvsMode)
+                    if (this.rvsMode)
                     {
-                        g.fillRect(cursorX,cursorY,curFontMetrics.stringWidth(sub),
-                                    fontHeight);
+                        g.fillRect(
+                            this.cursorX, this.cursorY, this.curFontMetrics.stringWidth(sub),
+                            this.fontHeight);
                         g.setColor(getBackground());
                     }
                     else
                     {
                         g.setColor(getBackground());
-                        g.fillRect(cursorX,cursorY,curFontMetrics.stringWidth(sub),
-                                    fontHeight);
+                        g.fillRect(
+                            this.cursorX, this.cursorY, this.curFontMetrics.stringWidth(sub),
+                            this.fontHeight);
                         g.setColor(getForeground());
                     }
                     
-                    g.drawString(sub,cursorX,cursorY+fontAscent);
+                    g.drawString(sub, this.cursorX, this.cursorY + this.fontAscent);
 
-                    if (rvsMode)
+                    if (this.rvsMode)
                         g.setColor(getForeground());
                     
-                    token = token.substring(maxCol - curCol);
+                    token = token.substring(maxCol - this.curCol);
                     
                     // Scroll, as above
-                    cursorX = curRegion.x * fontMaxWidth;
-                    curCol = curRegion.x;
-                    if ((curRow + 1) == maxRow)
+                    this.cursorX = this.curRegion.x * this.fontMaxWidth;
+                    this.curCol = this.curRegion.x;
+                    if (this.curRow + 1 == maxRow)
                         scrollUp(1);
-                    curRow++;
-                    cursorY = cursorY + fontHeight;
+                    this.curRow++;
+                    this.cursorY = this.cursorY + this.fontHeight;
                 }
             }
             
             // Draw the token.  If we have done wrapping, this is the portion of
             // the token that will fit on the last line.  Otherwise, it is the entire
             // token.
-            if (rvsMode)
+            if (this.rvsMode)
             {
-                g.fillRect(cursorX,cursorY,curFontMetrics.stringWidth(token),fontHeight);
+                g.fillRect(this.cursorX, this.cursorY, this.curFontMetrics.stringWidth(token), this.fontHeight);
                 g.setColor(getBackground());
             }
             else
             {
                 g.setColor(getBackground());
-                g.fillRect(cursorX,cursorY,curFontMetrics.stringWidth(token),fontHeight);
+                g.fillRect(this.cursorX, this.cursorY, this.curFontMetrics.stringWidth(token), this.fontHeight);
                 g.setColor(getForeground());
             }
             
-            g.drawString(token,cursorX,cursorY+fontAscent);
+            g.drawString(token, this.cursorX, this.cursorY + this.fontAscent);
             
-            if (rvsMode)
+            if (this.rvsMode)
                 g.setColor(getForeground());
-            
-            curCol += token.length();
-            cursorX += token.length() * fontMaxWidth; // We do not use stringWidth here, for the sake of consistency.
+
+            this.curCol += token.length();
+            this.cursorX += token.length() * this.fontMaxWidth; // We do not use stringWidth here, for the sake of consistency.
         }
         
         // Repaint the screen with the changes
@@ -418,15 +423,15 @@ public class TextScreen extends java.awt.Component
     public void newline()
     {
         // Adjust cursor position
-        cursorX = curRegion.x * fontMaxWidth;
-        curCol = curRegion.x;
-        cursorY = cursorY + fontHeight;
-        curRow++;
+        this.cursorX = this.curRegion.x * this.fontMaxWidth;
+        this.curCol = this.curRegion.x;
+        this.cursorY = this.cursorY + this.fontHeight;
+        this.curRow++;
         
         // Scroll if necessary.  As side effects, curRow and cursorY are
         // updated when we scroll.  Therefore,
         // if no scrolling happens, we need to repaint the screen.
-        if (curRow == (curRegion.x + curRegion.height))
+        if (this.curRow == this.curRegion.x + this.curRegion.height)
             scrollUp(1);
 
         Graphics g = getGraphics();
@@ -443,18 +448,18 @@ public class TextScreen extends java.awt.Component
     */
     public void gotoXY(int x,int y)
     {
-        if (x < cols)
-            curCol = x;
+        if (x < this.cols)
+            this.curCol = x;
         else
-            curCol = cols - 1;
+            this.curCol = this.cols - 1;
         
-        if (y < rows)
-            curRow = y;
+        if (y < this.rows)
+            this.curRow = y;
         else
-            curRow = rows - 1;
-        
-        cursorX = curCol * fontMaxWidth;
-        cursorY = curRow * fontHeight;
+            this.curRow = this.rows - 1;
+
+        this.cursorX = this.curCol * this.fontMaxWidth;
+        this.cursorY = this.curRow * this.fontHeight;
     }
     
     /** Scroll the region up by the specified number of lines.  If the number
@@ -470,7 +475,7 @@ public class TextScreen extends java.awt.Component
             return;
             
         // Just clear the region if the number of lines is out of range
-        if (numLines >= curRegion.height)
+        if (numLines >= this.curRegion.height)
         {
             clearScreen();
             return;
@@ -478,24 +483,26 @@ public class TextScreen extends java.awt.Component
         
         // Copy a region of the drawing area upwards; fill in the remaining area
         // with the background color.
-        Graphics g = offscreen.getGraphics();
+        Graphics g = this.offscreen.getGraphics();
         Dimension s = getSize();
-        int scrollSize = numLines * fontHeight;
-        g.copyArea(curRegion.x * fontMaxWidth,
-                    (curRegion.y * fontHeight) + scrollSize,
-                    curRegion.width * fontMaxWidth,
-                    (curRegion.height * fontHeight) - scrollSize,
-                    0,-(scrollSize));
+        int scrollSize = numLines * this.fontHeight;
+        g.copyArea(
+            this.curRegion.x * this.fontMaxWidth,
+                    this.curRegion.y * this.fontHeight + scrollSize,
+            this.curRegion.width * this.fontMaxWidth,
+                    this.curRegion.height * this.fontHeight - scrollSize,
+                    0,-scrollSize);
         g.setColor(getBackground());
-        g.fillRect(curRegion.x * fontMaxWidth,
-                    (((curRegion.y + curRegion.height) * fontHeight) - scrollSize),
-                    curRegion.width * fontMaxWidth,
+        g.fillRect(
+            this.curRegion.x * this.fontMaxWidth,
+            (this.curRegion.y + this.curRegion.height) * this.fontHeight - scrollSize,
+            this.curRegion.width * this.fontMaxWidth,
                     scrollSize);
         g.setColor(getForeground());
         
         // Adjust cursor coordinates
-        curRow = curRow - numLines;
-        cursorY = curRow * fontHeight;
+        this.curRow = this.curRow - numLines;
+        this.cursorY = this.curRow * this.fontHeight;
     }
     
     /** Set or clear reverse video mode.
@@ -504,7 +511,7 @@ public class TextScreen extends java.awt.Component
     */
     public void reverseVideo(boolean mode)
     {
-        rvsMode = mode;
+        this.rvsMode = mode;
     }
     
     /** Add the specified text style to the styles for this font, unless it's
@@ -520,7 +527,7 @@ public class TextScreen extends java.awt.Component
         if (style == Font.PLAIN)
             newstyle = Font.PLAIN;
         else
-            newstyle = (f.getStyle() | style);
+            newstyle = f.getStyle() | style;
         
         setFont(new Font(f.getName(),newstyle,f.getSize()));
     }
@@ -531,7 +538,7 @@ public class TextScreen extends java.awt.Component
     */
     public Point getCursorPosition()
     {
-        Point d = new Point(curCol,curRow);
+        Point d = new Point(this.curCol, this.curRow);
         return d;
     }
     
@@ -541,7 +548,7 @@ public class TextScreen extends java.awt.Component
     */
     public Dimension getScreenSize()
     {
-        Dimension d = new Dimension(cols,rows);
+        Dimension d = new Dimension(this.cols, this.rows);
         return d;
     }
     
@@ -552,8 +559,8 @@ public class TextScreen extends java.awt.Component
     */
     public synchronized void setScreenSize(int width,int height)
     {
-        rows = height;
-        cols = width;
+        this.rows = height;
+        this.cols = width;
         resizeToFit();
     }
     
@@ -572,21 +579,21 @@ public class TextScreen extends java.awt.Component
         int oldRows, oldCols;
         
         // First, save any portion of the screen that we need to.
-        if (height < rows)
+        if (height < this.rows)
         {
             if (saveBottom)
             {
                 r.x = 0;
-                r.y = (rows * fontHeight) - (height * fontHeight);
-                r.width = (width * fontMaxWidth);
-                r.height = (height * fontHeight);
+                r.y = this.rows * this.fontHeight - height * this.fontHeight;
+                r.width = width * this.fontMaxWidth;
+                r.height = height * this.fontHeight;
             }
             else
             {
                 r.x = 0;
                 r.y = 0;
-                r.width = (width * fontMaxWidth);
-                r.height = (height * fontHeight);
+                r.width = width * this.fontMaxWidth;
+                r.height = height * this.fontHeight;
             }
         }
         else // We're making the screen bigger, so copy the whole thing
@@ -599,25 +606,25 @@ public class TextScreen extends java.awt.Component
         
         // Copy the screen portion we just set up.
         CropImageFilter filter = new CropImageFilter(r.x,r.y,r.width,r.height);
-        oldScreen = getToolkit().createImage(new FilteredImageSource(offscreen.getSource(),filter));
+        oldScreen = getToolkit().createImage(new FilteredImageSource(this.offscreen.getSource(),filter));
         
         // Set up new size
-        oldRows = rows;
-        oldCols = cols;
-        rows = height;
-        cols = width;
+        oldRows = this.rows;
+        oldCols = this.cols;
+        this.rows = height;
+        this.cols = width;
         
         // Compute the size and resize the component
-        height = fontHeight * rows;
-        width = fontMaxWidth * cols;
+        height = this.fontHeight * this.rows;
+        width = this.fontMaxWidth * this.cols;
         setSize(width,height);
         
         // Get a new offscreen drawing area
         Dimension s = getSize();
-        offscreen = createImage(s.width,s.height);
+        this.offscreen = createImage(s.width,s.height);
         
         // Clear it, then put the old image data back in it.
-        Graphics g = offscreen.getGraphics();
+        Graphics g = this.offscreen.getGraphics();
         g.setColor(getBackground());
         g.fillRect(0,0,s.width,s.height);
         g.setColor(getForeground());
@@ -625,14 +632,14 @@ public class TextScreen extends java.awt.Component
         
         // Put the cursor in an appropriate place.  Adjust it if necessary to keep it
         // in the same place in the text; if it is offscreen, home it.
-        curRow -= (oldRows - rows);
-        if ((curRow < 0) || (curRow >= rows) || (curCol < 0) || (curCol >= cols))
+        this.curRow -= oldRows - this.rows;
+        if (this.curRow < 0 || this.curRow >= this.rows || this.curCol < 0 || this.curCol >= this.cols)
         {
-            curCol = 0;
-            curRow = 0;
+            this.curCol = 0;
+            this.curRow = 0;
         }
-        cursorX = curCol * fontMaxWidth;
-        cursorY = curRow * fontHeight;
+        this.cursorX = this.curCol * this.fontMaxWidth;
+        this.cursorY = this.curRow * this.fontHeight;
         
         // Paint everything
         g = getGraphics();
@@ -645,7 +652,7 @@ public class TextScreen extends java.awt.Component
     */
     public Dimension getFontSize()
     {
-        Dimension d = new Dimension(fontMaxWidth,fontHeight);
+        Dimension d = new Dimension(this.fontMaxWidth, this.fontHeight);
         return d;
     }
     
@@ -655,7 +662,7 @@ public class TextScreen extends java.awt.Component
     */
     public void setAttributes(int attrs)
     {
-        attributes = attrs;
+        this.attributes = attrs;
     }
     
     /** Get the current TextScreen attributes
@@ -664,7 +671,7 @@ public class TextScreen extends java.awt.Component
     */
     public int getAttributes()
     {
-        return attributes;
+        return this.attributes;
     }
 
     /** Read a line of text from the keyboard and append it to a supplied
@@ -680,16 +687,16 @@ public class TextScreen extends java.awt.Component
         Graphics g = getGraphics();
         
         // Draw the cursor, in case it disappeared.
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getForeground());
-            g.fillRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.fillRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
         
         // Set up readline state
-        readString = sb;
-        readThread = Thread.currentThread();
-        state = READLINE;
+        this.readString = sb;
+        this.readThread = Thread.currentThread();
+        this.state = READLINE;
         
         // Now wait until we are notified by the event handler that
         // the readline has terminated (or we're interrupted).
@@ -702,18 +709,18 @@ public class TextScreen extends java.awt.Component
         {
             // Don't actually do anything here
         }
-        readThread = null;
+        this.readThread = null;
         
         // We resumed without error, so the completed string is in readString.
         // Clear the cursor, since this is the expected state.
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getBackground());
-            g.clearRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.clearRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
         
         // Return the key that terminated the read
-        return readTerminator;
+        return this.readTerminator;
     }
     
     /** As readLine(StringBuffer), except that the read will time out after
@@ -730,16 +737,16 @@ public class TextScreen extends java.awt.Component
         boolean timedOut = false;
         
         // Draw the cursor, in case it disappeared.
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getForeground());
-            g.fillRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.fillRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
     
         // Set up for read mode
-        readString = sb;
-        readThread = Thread.currentThread();
-        state = READLINE;
+        this.readString = sb;
+        this.readThread = Thread.currentThread();
+        this.state = READLINE;
         
         // Wait for signal from event handler, as above
         try
@@ -750,28 +757,28 @@ public class TextScreen extends java.awt.Component
         {
             // Do nothing
         }
-        readThread = null;
+        this.readThread = null;
         
         // If state is still READLINE, that means we did not terminate
         // (that is, we timed out)
-        if (state == READLINE)
+        if (this.state == READLINE)
         {
-            state = WRITE;
+            this.state = WRITE;
             timedOut = true;
         }
         
         // Nuke the cursor
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getBackground());
-            g.clearRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.clearRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
 
         // Return an appropriate value
         if (timedOut)
             return -1;
         else
-            return readTerminator;
+            return this.readTerminator;
     }
     
     /** Read a character from the keyboard and return it.  If KEYECHO is on,
@@ -784,15 +791,15 @@ public class TextScreen extends java.awt.Component
         Graphics g = getGraphics();
         
         // Draw the cursor, in case it disappeared.
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getForeground());
-            g.fillRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.fillRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
         
         // Set up for readchar mode
-        readThread = Thread.currentThread();
-        state = READCHAR;
+        this.readThread = Thread.currentThread();
+        this.state = READCHAR;
         
         // Wait for event handler to notify us
         try
@@ -804,17 +811,17 @@ public class TextScreen extends java.awt.Component
         {
             // Do nothing
         }
-        readThread = null;
+        this.readThread = null;
         
         // Erase the cursor
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getBackground());
-            g.clearRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.clearRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
             
         // The character is in curReadChar
-        return curReadChar;
+        return this.curReadChar;
     }
     
     /** Read a character from the keyboard and return it, timing out after
@@ -830,15 +837,15 @@ public class TextScreen extends java.awt.Component
         boolean timedOut = false;
         
         // Draw the cursor, in case it disappeared.
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getForeground());
-            g.fillRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.fillRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
 
         // Set up for readchar mode
-        readThread = Thread.currentThread();
-        state = READCHAR;
+        this.readThread = Thread.currentThread();
+        this.state = READCHAR;
         
         // Wait for notification or timeout
         try
@@ -849,65 +856,70 @@ public class TextScreen extends java.awt.Component
         {
             // Do nothing
         }
-        readThread = null;
+        this.readThread = null;
         
         // If state is still READCHAR, we timed out.
-        if (state == READCHAR)
+        if (this.state == READCHAR)
         {
-            state = WRITE;
+            this.state = WRITE;
             timedOut = true;
         }
         
         // Get rid of the cursor
-        if ((attributes & CURSOR) == CURSOR)
+        if ((this.attributes & CURSOR) == CURSOR)
         {
             g.setColor(getBackground());
-            g.clearRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.clearRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
         
         // Return the appropriate value
         if (timedOut)
             return -1;
         else
-            return curReadChar;
+            return this.curReadChar;
     }
     
     /** Override of paint() method */
+    @Override
     public void paint(Graphics g)
     {
         // Copy the offscreen drawing area to the screen.
-        if (offscreen != null)
-            g.drawImage(offscreen,0,0,this);
+        if (this.offscreen != null)
+            g.drawImage(this.offscreen,0,0,this);
         
         // Draw the cursor if necessary
-        if(((attributes & CURSOR) == CURSOR) && (state != WRITE))
+        if((this.attributes & CURSOR) == CURSOR && this.state != WRITE)
         {
             g.setColor(getForeground());
-            g.fillRect(cursorX+1,cursorY+1,fontMaxWidth-2,fontHeight-2);
+            g.fillRect(this.cursorX +1, this.cursorY +1, this.fontMaxWidth -2, this.fontHeight -2);
         }
     }
     
     /** Override of getMinimumSize() method **/
+    @Override
     public Dimension getMinimumSize()
     {
-        return (new Dimension((cols * fontMaxWidth),(rows * fontHeight)));
+        return new Dimension(this.cols * this.fontMaxWidth, this.rows * this.fontHeight);
     }
     
     /** Override of getMaximumSize() method **/
+    @Override
     public Dimension getMaximumSize()
     {
-        return (new Dimension((cols * fontMaxWidth),(rows * fontHeight)));
+        return new Dimension(this.cols * this.fontMaxWidth, this.rows * this.fontHeight);
     }
     
     /** Override of getPreferredSize() method **/
+    @Override
     public Dimension getPreferredSize()
     {
-        return (new Dimension((cols * fontMaxWidth),(rows * fontHeight)));
+        return new Dimension(this.cols * this.fontMaxWidth, this.rows * this.fontHeight);
     }
     
     /** Override of addNotify().  Does additional initialization that has
         to wait until a peer is created.
     */
+    @Override
     public void addNotify()
     {
         super.addNotify();

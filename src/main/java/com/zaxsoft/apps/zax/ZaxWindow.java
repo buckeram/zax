@@ -37,15 +37,15 @@ class ZaxWindow extends Object {
     // Constructor
     public ZaxWindow()
     {
-        shape = new Rectangle(0,0,0,0);
-        cursorPosition = new Point(0,0);
-        tstyle = 0;
+        this.shape = new Rectangle(0,0,0,0);
+        this.cursorPosition = new Point(0,0);
+        this.tstyle = 0;
     }
 
     public ZaxWindow(int x,int y,int w,int h)
     {
-        shape = new Rectangle(x,y,w,h);
-        cursorPosition = new Point(0,0);
-        tstyle = 0;
+        this.shape = new Rectangle(x,y,w,h);
+        this.cursorPosition = new Point(0,0);
+        this.tstyle = 0;
     }
 }

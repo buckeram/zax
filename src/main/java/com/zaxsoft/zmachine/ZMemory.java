@@ -36,40 +36,40 @@ class ZMemory extends Object {
         File f;
         FileInputStream fis;
         DataInputStream dis;
-        zui = ui;
+        this.zui = ui;
 
         // Read in the story file
         f = new File(storyFile);
-        if((!f.exists()) || (!f.canRead()) || (!f.isFile()))
-            zui.fatal("Storyfile " + storyFile + " not found.");
-        dataLength = (int)f.length();
-        data = new byte[dataLength];
+        if(!f.exists() || !f.canRead() || !f.isFile())
+            this.zui.fatal("Storyfile " + storyFile + " not found.");
+        this.dataLength = (int)f.length();
+        this.data = new byte[this.dataLength];
         try {
             fis = new FileInputStream(f);
             dis = new DataInputStream(fis);
-            dis.readFully(data,0,dataLength);
+            dis.readFully(this.data,0, this.dataLength);
             fis.close();
         }
         catch (IOException ioex) {
-            zui.fatal("I/O error loading storyfile.");
+            this.zui.fatal("I/O error loading storyfile.");
         }
     }
 
     // Fetch a byte from the specified address
     int fetchByte(int addr)
     {
-        if (addr > (dataLength - 1))
-            zui.fatal("Memory fault: address " + addr);
-        int i = (data[addr] & 0xff);
+        if (addr > this.dataLength - 1)
+            this.zui.fatal("Memory fault: address " + addr);
+        int i = this.data[addr] & 0xff;
         return i;
     }
 
     // Store a byte at the specified address
     void putByte(int addr,int b)
     {
-        if (addr > (dataLength - 1))
-            zui.fatal("Memory fault: address " + addr);
-        data[addr] = (byte)(b & 0xff);
+        if (addr > this.dataLength - 1)
+            this.zui.fatal("Memory fault: address " + addr);
+        this.data[addr] = (byte)(b & 0xff);
     }
 
     // Fetch a word from the specified address
@@ -77,31 +77,31 @@ class ZMemory extends Object {
     {
         int i;
 
-        if (addr > (dataLength - 1))
-            zui.fatal("Memory fault: address " + addr);
-        i = (((data[addr] << 8) | (data[addr+1] & 0xff)) & 0xffff);
+        if (addr > this.dataLength - 1)
+            this.zui.fatal("Memory fault: address " + addr);
+        i = (this.data[addr] << 8 | this.data[addr+1] & 0xff) & 0xffff;
         return i;
     }
 
     // Store a word at the specified address
     void putWord(int addr,int w)
     {
-        if (addr > (dataLength - 1))
-            zui.fatal("Memory fault: address " + addr);
-        data[addr] = (byte)((w >> 8) & 0xff);
-        data[addr+1] = (byte)(w & 0xff);
+        if (addr > this.dataLength - 1)
+            this.zui.fatal("Memory fault: address " + addr);
+        this.data[addr] = (byte)(w >> 8 & 0xff);
+        this.data[addr+1] = (byte)(w & 0xff);
     }
 
 	// Dump the specified amount of memory, starting at the specified address,
 	// to the specified DataOutputStream.
 	void dumpMemory(DataOutputStream dos,int addr,int len) throws IOException
 	{
-		dos.write(data,addr,len);
+		dos.write(this.data,addr,len);
 	}
 
 	// Read in memory stored by dumpMemory.
 	void readMemory(DataInputStream dis,int addr,int len) throws IOException
 	{
-		dis.read(data,addr,len);
+		dis.read(this.data,addr,len);
 	}
 }

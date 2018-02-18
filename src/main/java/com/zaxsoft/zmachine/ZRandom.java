@@ -32,8 +32,8 @@ class ZRandom extends Object {
     // ZMachine.
     void initialize(ZUserInterface ui)
     {
-        zui = ui;
-        rnd = new Random();
+        this.zui = ui;
+        this.rnd = new Random();
     }
 
     // Seed the random number generator with s.  If s == 0, use
@@ -41,14 +41,14 @@ class ZRandom extends Object {
     void seed(int s)
     {
         if (s == 0)
-            rnd = new Random();
+            this.rnd = new Random();
         else
-            rnd = new Random((long)s);
+            this.rnd = new Random((long)s);
     }
 
     // Get a random number between 1 and s, inclusive.
     int getRandom(int s)
     {
-		return (Math.abs(rnd.nextInt()) % s) + 1;
+		return Math.abs(this.rnd.nextInt()) % s + 1;
     }
 }
